@@ -62,14 +62,7 @@
           0
         ],
         "Brightness": 2,
-        "GlobalShadows": true,
-        "Outlines": false,
-        "Technology": "Voxel"
-      }
-    },
-    "Players": {
-      "$properties": {
-        "MaximumPlayers": 24
+        "GlobalShadows": true
       }
     },
     "SoundService": {
