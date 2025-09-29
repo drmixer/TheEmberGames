@@ -45,6 +45,37 @@
     },
     "ReplicatedFirst": {
       "$path": "src/shared"
+    },
+    "Workspace": {
+      "$properties": {
+        "Gravity": 196.2
+      },
+      "Terrain": {
+        "$className": "Terrain"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "Ambient": [
+          0,
+          0,
+          0
+        ],
+        "Brightness": 2,
+        "GlobalShadows": true,
+        "Outlines": false,
+        "Technology": "Voxel"
+      }
+    },
+    "Players": {
+      "$properties": {
+        "MaximumPlayers": 24
+      }
+    },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
     }
   }
 }

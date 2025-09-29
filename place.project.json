@@ -1,0 +1,53 @@
+{
+  "name": "The Ember Games Place",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$path": "src/server"
+    },
+    "StarterPlayer": {
+      "$path": "src/client"
+    },
+    "ReplicatedFirst": {
+      "$path": "src/shared"
+    },
+    "ReplicatedStorage": {
+      "$path": "src/ReplicatedStorage"
+    },
+    "Workspace": {
+      "$properties": {
+        "Gravity": 196.2
+      },
+      "Terrain": {
+        "$className": "Terrain",
+        "$properties": {
+          "WaterWaveSize": 0.2,
+          "WaterWaveSpeed": 12,
+          "WaterTransparency": 0.3,
+          "WaterReflectance": 0.2
+        }
+      }
+    },
+    "Players": {
+      "$properties": {
+        "CharacterAutoSpawn": true,
+        "MaximumPlayers": 24,
+        "CharacterAddMeshes": true
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "GlobalShadows": true,
+        "Brightness": 2,
+        "ClockTime": 10.5,
+        "FogEnd": 10000,
+        "FogStart": 0
+      }
+    },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    }
+  }
+}
