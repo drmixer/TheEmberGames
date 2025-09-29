@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+*.lock
+
+# User-specific files
+*.settings
+*.userprefs
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+logs/
+*.log
+
+# Rojo cache (if any)
+.rbx/
+rbx/
+
+# Local Rojo settings
+*.rbxl
+*.rbxlx

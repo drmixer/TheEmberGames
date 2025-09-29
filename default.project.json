@@ -1,0 +1,50 @@
+{
+  "name": "The Ember Games",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$path": "src/ReplicatedStorage"
+    },
+    "ServerScriptService": {
+      "$path": "src/server",
+      "ServerMain": {
+        "$path": "src/server/ServerMain.lua"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "$path": "src/client",
+        "StarterGui": {
+          "$path": "src/client/StarterGui.lua"
+        },
+        "UIController": {
+          "$path": "src/client/UIController.lua"
+        },
+        "EmoteController": {
+          "$path": "src/client/EmoteController.lua"
+        },
+        "CraftingGui": {
+          "$path": "src/client/CraftingGui.lua"
+        },
+        "CombatGui": {
+          "$path": "src/client/CombatGui.lua"
+        },
+        "InventoryGui": {
+          "$path": "src/client/InventoryGui.lua"
+        },
+        "SpectatorMode": {
+          "$path": "src/client/SpectatorMode.lua"
+        },
+        "ControllerSupport": {
+          "$path": "src/client/ControllerSupport.lua"
+        },
+        "MobileSupport": {
+          "$path": "src/client/MobileSupport.lua"
+        }
+      }
+    },
+    "ReplicatedFirst": {
+      "$path": "src/shared"
+    }
+  }
+}
