@@ -1,27 +1,32 @@
 -- ServerScript: DevelopmentArenaService.lua
--- Development version of ArenaService that creates visible arena elements for testing
+-- Development version of ArenaService that creates solid, visible arena elements for testing
 
 local Workspace = game:GetService("Workspace")
 
 local Config = require(script.Parent.shared.Config)
 
--- Create visual arena boundaries for development/testing
-local function createVisibleArenaBoundaries()
+-- Create solid arena boundaries for development/testing
+local function createSolidArenaBoundaries()
     local arenaSize = Config.ARENA_SIZE
     local wallHeight = 200
     
-    -- Create ground platform at center
+    -- First, clear any existing terrain to ensure our parts work
+    if Workspace:FindFirstChild("Terrain") then
+        Workspace.Terrain:Destroy()
+    end
+    
+    -- Create solid ground platform at Y=0
     local ground = Instance.new("Part")
     ground.Name = "ArenaGround"
-    ground.Size = Vector3.new(arenaSize, 1, arenaSize)
-    ground.Position = Vector3.new(0, 0, 0)
+    ground.Size = Vector3.new(arenaSize, 5, arenaSize) -- Thicker to ensure solid ground
+    ground.Position = Vector3.new(0, -2.5, 0) -- Positioned so top surface is at Y=0
     ground.Anchored = true
     ground.CanCollide = true
     ground.Material = Enum.Material.Grass
     ground.Color = Color3.fromRGB(34, 139, 34) -- Green
     ground.Parent = Workspace
     
-    -- Create visible walls at the edge of the arena
+    -- Create solid walls at the edge of the arena
     -- North wall
     local northWall = Instance.new("Part")
     northWall.Name = "ArenaBoundary_North"
@@ -56,16 +61,16 @@ local function createVisibleArenaBoundaries()
     westWall.Position = Vector3.new(-arenaSize/2 - 2.5, wallHeight/2, 0)
     westWall.Parent = Workspace
     
-    print("Development Arena boundaries created - visible in editor")
+    print("Solid Arena boundaries created - ground at Y=0")
 end
 
--- Create visible Cornucopia landmark
-local function createVisibleCornucopia()
-    -- Create the iconic spiral horn structure
+-- Create solid Cornucopia landmark
+local function createSolidCornucopia()
+    -- Create the iconic spiral horn structure with solid base
     local cornucopiaBase = Instance.new("Part")
     cornucopiaBase.Name = "Cornucopia"
     cornucopiaBase.Size = Vector3.new(30, 15, 30)
-    cornucopiaBase.Position = Vector3.new(0, 7.5, 0)
+    cornucopiaBase.Position = Vector3.new(0, 7.5, 0) -- Positioned so bottom is at Y=0
     cornucopiaBase.Anchored = true
     cornucopiaBase.CanCollide = true
     cornucopiaBase.Material = Enum.Material.Brick
@@ -83,18 +88,18 @@ local function createVisibleCornucopia()
     horn.Color = Color3.fromRGB(210, 180, 140)
     horn.Parent = Workspace
     
-    print("Development Cornucopia landmark created - visible in editor")
+    print("Solid Cornucopia landmark created at (0, 0, 0)")
 end
 
 -- Create some visual biomes for development
-local function createVisibleBiomes()
-    -- Create a few visual markers for different biomes
+local function createVisualBiomes()
+    -- Create a few visual markers for different biomes (non-colliding)
     local biomeMarkers = {
-        {name = "Forest_NE", pos = Vector3.new(200, 5, -200), color = Color3.fromRGB(0, 100, 0), size = Vector3.new(100, 1, 100)},
-        {name = "Forest_NW", pos = Vector3.new(-200, 5, -200), color = Color3.fromRGB(0, 100, 0), size = Vector3.new(100, 1, 100)},
-        {name = "Meadow_SE", pos = Vector3.new(200, 5, 200), color = Color3.fromRGB(144, 238, 144), size = Vector3.new(100, 1, 100)},
-        {name = "Meadow_SW", pos = Vector3.new(-200, 5, 200), color = Color3.fromRGB(144, 238, 144), size = Vector3.new(100, 1, 100)},
-        {name = "River_S", pos = Vector3.new(0, 5, 300), color = Color3.fromRGB(30, 144, 255), size = Vector3.new(120, 1, 120)},
+        {name = "Forest_NE", pos = Vector3.new(200, 1, -200), color = Color3.fromRGB(0, 100, 0), size = Vector3.new(100, 2, 100)},
+        {name = "Forest_NW", pos = Vector3.new(-200, 1, -200), color = Color3.fromRGB(0, 100, 0), size = Vector3.new(100, 2, 100)},
+        {name = "Meadow_SE", pos = Vector3.new(200, 1, 200), color = Color3.fromRGB(144, 238, 144), size = Vector3.new(100, 2, 100)},
+        {name = "Meadow_SW", pos = Vector3.new(-200, 1, 200), color = Color3.fromRGB(144, 238, 144), size = Vector3.new(100, 2, 100)},
+        {name = "River_S", pos = Vector3.new(0, 1, 300), color = Color3.fromRGB(30, 144, 255), size = Vector3.new(120, 2, 120)},
     }
     
     for _, marker in ipairs(biomeMarkers) do
@@ -114,8 +119,10 @@ local function createVisibleBiomes()
 end
 
 -- Initialize development arena
-print("DevelopmentArenaService: Creating visible arena elements...")
-createVisibleArenaBoundaries()
-createVisibleCornucopia()
-createVisibleBiomes()
-print("DevelopmentArenaService: Arena created successfully for testing")
+print("DevelopmentArenaService: Creating solid arena elements...")
+createSolidArenaBoundaries()
+createSolidCornucopia()
+createVisualBiomes()
+print("DevelopmentArenaService: Solid arena created successfully for testing")
+print("Ground is at Y=0, Cornucopia is centered at (0, 0, 0)")
+print("Spawn location will be set to (0, 20, 0) to start above ground")

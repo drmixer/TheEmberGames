@@ -2,40 +2,24 @@
 -- Development setup for The Ember Games
 -- Ensures arena is created for testing even outside normal game flow
 
-local ArenaService = require(script.Parent.ArenaService)
-local CharacterSpawner = require(script.Parent.CharacterSpawner)
 local Players = game:GetService("Players")
-
--- Create arena and boundaries immediately for development/testing
-print("DevelopmentSetup: Creating arena for testing...")
-
--- Initialize arena service to create boundaries and Cornucopia
-ArenaService:init()
-
--- Wait a moment for initialization to complete
-wait(0.5)
-
--- Initialize and create match arena (this should create Cornucopia)
-ArenaService:initializeMatch()
-
-print("DevelopmentSetup: Arena created successfully for testing")
 
 -- Force spawn player immediately when they join
 Players.PlayerAdded:Connect(function(player)
     print("DevelopmentSetup: New player detected, spawning...")
     
     -- Give a moment for the player to fully load
-    wait(1)
+    wait(2)  -- Increased wait time to ensure arena is fully created
     
     -- Spawn the player at a specific location for development
-    local spawnLocation = Vector3.new(0, 10, 0) -- Start above ground to see the Cornucopia
+    local spawnLocation = Vector3.new(0, 20, 0) -- Start well above ground to see the Cornucopia
     
     player.CharacterAdded:Connect(function(character)
-        wait(0.5) -- Wait for character to load completely
-        local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
+        wait(1) -- Wait a bit longer for character to load completely
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 10)
         if humanoidRootPart then
             humanoidRootPart.CFrame = CFrame.new(spawnLocation)
-            print("DevelopmentSetup: Player spawned at test location")
+            print("DevelopmentSetup: Player spawned at test location (0, 20, 0)")
         end
     end)
     
@@ -48,11 +32,12 @@ end)
 -- For development, immediately spawn if players are already present
 for _, player in pairs(Players:GetPlayers()) do
     print("DevelopmentSetup: Player already present, spawning...")
+    wait(2) -- Ensure arena is created first
     player.CharacterAdded:Connect(function(character)
-        wait(0.5)
-        local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
+        wait(1)
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 10)
         if humanoidRootPart then
-            humanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 10, 0))
+            humanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 20, 0))
         end
     end)
     
@@ -61,4 +46,5 @@ for _, player in pairs(Players:GetPlayers()) do
     end
 end
 
-print("DevelopmentSetup: Ready for development testing - arena should be visible at origin")
+print("DevelopmentSetup: Ready for development testing - spawning at (0, 20, 0)")
+print("Arena elements created by DevelopmentArenaService in separate script")
