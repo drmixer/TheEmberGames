@@ -161,13 +161,28 @@ local function createArenaBoundaries()
     print("Arena boundaries created")
 end
 
+-- Create ground plane
+local function createGroundPlane()
+    local ground = Instance.new("Part")
+    ground.Name = "ArenaGround"
+    ground.Size = Vector3.new(Config.ARENA_SIZE, 1, Config.ARENA_SIZE) -- 1 stud high, but covers full arena
+    ground.Position = Vector3.new(0, 0, 0) -- At Y=0, so the top surface is at Y=0.5
+    ground.Anchored = true
+    ground.CanCollide = true
+    ground.Material = Enum.Material.Grass
+    ground.Color = Color3.fromRGB(34, 139, 34) -- Forest green
+    ground.Parent = Workspace
+    
+    print("Arena ground created")
+end
+
 -- Create Cornucopia landmark
 local function createCornucopia()
     -- Create the iconic spiral horn structure
     local cornucopiaBase = Instance.new("Part")
     cornucopiaBase.Name = "Cornucopia"
     cornucopiaBase.Size = Vector3.new(30, 15, 30)
-    cornucopiaBase.Position = Vector3.new(0, 7.5, 0)
+    cornucopiaBase.Position = Vector3.new(0, 7.5, 0) -- Now positioned at Y=7.5 above the ground
     cornucopiaBase.Anchored = true
     cornucopiaBase.CanCollide = true
     cornucopiaBase.Material = Enum.Material.SmoothPlastic
@@ -376,6 +391,9 @@ function ArenaService.init()
     
     -- Set up biome zones
     setupBiomeZones()
+    
+    -- Create ground plane first
+    createGroundPlane()
     
     -- Create arena boundaries
     createArenaBoundaries()

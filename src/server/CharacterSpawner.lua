@@ -18,7 +18,7 @@ CharacterSpawner.playersSpawned = {}
 
 -- Initialize spawn positions around the Cornucopia
 local function initializeSpawnPositions()
-    local arenaCenter = Vector3.new(0, 5, 0) -- Assuming Cornucopia center
+    local arenaCenter = Vector3.new(0, 7.5, 0) -- Center of Cornucopia base (which is at Y=7.5 with height 15)
     local radius = 35 -- Distance from center
     
     for i = 1, Config.PLAYER_CAP do
@@ -26,8 +26,8 @@ local function initializeSpawnPositions()
         local x = arenaCenter.X + radius * math.cos(angle)
         local z = arenaCenter.Z + radius * math.sin(angle)
         
-        -- Find appropriate Y position (ground level)
-        local groundY = 5 -- Default height, adjust based on terrain in real implementation
+        -- Find appropriate Y position (above ground level)
+        local groundY = 8 -- Above the ground plane (top of ground is at Y=0.5, Cornucopia base is at Y=7.5 with height 15, so Y=8 is just above the base)
         
         table.insert(CharacterSpawner.spawnPositions, Vector3.new(x, groundY, z))
     end
