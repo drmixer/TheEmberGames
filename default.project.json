@@ -9,6 +9,12 @@
       "$path": "src/server",
       "ServerMain": {
         "$path": "src/server/ServerMain.lua"
+      },
+      "DevelopmentSetup": {
+        "$path": "src/server/DevelopmentSetup.lua"
+      },
+      "DevelopmentArenaService": {
+        "$path": "src/server/DevelopmentArenaService.lua"
       }
     },
     "StarterPlayer": {

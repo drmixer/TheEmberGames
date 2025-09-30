@@ -1,4 +1,4 @@
--- ServerScript: ServerMain.lua
+-- ServerScript: ServerMain.lua TEST UPDATE
 -- Main initialization script for The Ember Games
 -- Loads and initializes all game services
 
