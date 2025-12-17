@@ -28,6 +28,8 @@ local ValidationRunner = require(script.Parent.ValidationRunner)
 
 -- Phase 6: Polish & Advanced Features
 local AllianceSystem = require(script.Parent.AllianceSystem)
+local SeasonalRewards = require(script.Parent.SeasonalRewards)
+local ArenaVariants = require(script.Parent.ArenaVariants)
 
 -- Initialize all services
 function ServerMain.init()
@@ -91,10 +93,56 @@ function ServerMain.init()
     -- Initialize AllianceSystem (player alliances, betrayal mechanics)
     AllianceSystem.init()
     
+    -- Initialize SeasonalRewards (battle pass, challenges, progression)
+    SeasonalRewards.init()
+    
+    -- Initialize ArenaVariants (different arena themes)
+    ArenaVariants.init()
+    
+    -- ============ PHASE 7: Critical Infrastructure ============
+    
+    -- Initialize DataManager (save/load player data)
+    local DataManager = require(script.Parent.DataManager)
+    DataManager.init()
+    
+    -- ============ PHASE 7: Social Features ============
+    
+    -- Initialize PingService (ally communication)
+    local PingService = require(script.Parent.PingService)
+    PingService.init()
+    
+    -- Initialize LeaderboardService (global rankings)
+    local LeaderboardService = require(script.Parent.LeaderboardService)
+    LeaderboardService.init()
+    
+    -- ============ PHASE 7: Advanced Features ============
+    
+    -- Initialize PartyService (friends/party system)
+    local PartyService = require(script.Parent.PartyService)
+    PartyService.init()
+    
+    -- Initialize PrivateMatchService (custom games)
+    local PrivateMatchService = require(script.Parent.PrivateMatchService)
+    PrivateMatchService.init()
+    
+    -- Initialize RankedService (competitive matchmaking)
+    local RankedService = require(script.Parent.RankedService)
+    RankedService.init()
+    
+    -- ============ PHASE 7: Stretch Goals ============
+    
+    -- Initialize ReplayService (match recording)
+    local ReplayService = require(script.Parent.ReplayService)
+    ReplayService.init()
+    
+    -- Initialize ShopService (premium shop/monetization)
+    local ShopService = require(script.Parent.ShopService)
+    ShopService.init()
+    
     print("[ServerMain] All services initialized successfully!")
-    print("[ServerMain] ✅ Phase 5 Complete - All multiplayer systems active")
-    print("[ServerMain] ✅ Phase 6 Polish - Alliance system, cosmetics enabled")
-    print("[ServerMain] The Ember Games server is ready for tributes!")
+    print("[ServerMain] ✅ All Implementation Phases Complete")
+    print("[ServerMain] ✅ All POLISHPLAN Features Complete")
+    print("[ServerMain] 🔥 The Ember Games is RELEASE READY! 🔥")
 end
 
 -- Initialize the server when this module is required

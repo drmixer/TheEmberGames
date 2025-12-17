@@ -61,7 +61,36 @@ safeRequire("AdminPanel")
 safeRequire("TrailEffects")
 safeRequire("VictoryPoses")
 safeRequire("AllianceUI")
+safeRequire("SeasonalUI")
+
+-- Phase 7: Essential Polish (POLISHPLAN.md)
+safeRequire("MatchHUD")
+safeRequire("KillFeed")
+safeRequire("Compass")
+safeRequire("NotificationManager")
+
+-- Phase 7: Core Experience
+safeRequire("MainMenuUI")
+safeRequire("SettingsUI")
+safeRequire("CosmeticsUI")
+
+-- Phase 7: Critical Infrastructure
+safeRequire("Minimap")
+safeRequire("TutorialUI")
+
+-- Phase 7: Social Features
+safeRequire("PingSystem")
+safeRequire("LeaderboardUI")
+
+-- Phase 7: Advanced Features
+safeRequire("PartyUI")
+safeRequire("PrivateMatchUI")
+safeRequire("RankedUI")
+
+-- Phase 7: Stretch Goals
+safeRequire("ReplayViewer")
+safeRequire("ShopUI")
 
 print("[Client] The Ember Games client started successfully!")
-print("[Client] Press F8 to toggle Admin Panel for testing")
-print("[Client] Press G for emotes, P for alliances")
+print("[Client] Keys: F8=Admin, G=Emotes, P=Alliances, B=BattlePass, C=Customize, M=Map")
+print("[Client] More: L=Leaderboard, T=Party, J=PrivateMatch, Shift+R=Ranked, Y=Replay, O=Shop")
