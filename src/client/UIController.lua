@@ -321,7 +321,7 @@ function UIController.init()
             UIController.statusText.Text = "Match Delayed - Tributes Gathering"
         elseif eventType == "MATCH_STARTING" then
             UIController:showCountdown(true, 0)
-            wait(1)
+            task.wait(1)
             UIController:showCountdown(false)
             UIController.statusText.Text = "THE GAMES HAVE BEGUN!"
         elseif eventType == "LOBBY_STATUS" then

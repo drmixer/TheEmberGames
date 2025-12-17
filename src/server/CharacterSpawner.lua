@@ -10,7 +10,7 @@ local Debris = game:GetService("Debris")
 
 local LobbyService = require(script.Parent.LobbyService)
 local PlayerStats = require(script.Parent.PlayerStats)
-local Config = require(script.Parent.shared.Config)
+local Config = require(script.Parent.Parent.shared.Config)
 
 local CharacterSpawner = {}
 CharacterSpawner.spawnPositions = {}
@@ -65,7 +65,7 @@ function CharacterSpawner:spawnPlayer(player)
         local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
         
         -- Move character to spawn position after a delay to ensure load
-        wait(0.5)
+        task.wait(0.5)
         if humanoidRootPart and humanoidRootPart.Parent then
             humanoidRootPart.CFrame = CFrame.new(spawnPosition)
             
@@ -103,7 +103,7 @@ function CharacterSpawner:respawnPlayer(player)
     -- But for MVP testing, we might want to allow respawning
     -- In a real implementation, this would be disabled or limited
     
-    wait(3) -- Delay before respawn
+    task.wait(3) -- Delay before respawn
     CharacterSpawner:spawnPlayer(player)
 end
 
@@ -129,7 +129,7 @@ function CharacterSpawner:init()
     Players.PlayerAdded:Connect(function(player)
         -- For MVP testing, spawn immediately when player joins
         -- In real game, this would only happen at match start
-        wait(2) -- Give other systems time to initialize
+        task.wait(2) -- Give other systems time to initialize
         CharacterSpawner:spawnPlayer(player)
     end)
     

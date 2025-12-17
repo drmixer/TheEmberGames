@@ -6,7 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local Config = require(script.Parent.shared.Config)
+local Config = require(script.Parent.Parent.shared.Config)
 
 local PlayerStats = {}
 PlayerStats.playerStats = {}
@@ -233,7 +233,7 @@ local function onPlayerAdded(player)
     -- Track player activity for survival systems
     player.CharacterAdded:Connect(function(character)
         -- Connect to character movement/input
-        wait(1) -- Wait for character to fully load
+        task.wait(1) -- Wait for character to fully load
         trackPlayerActivity(player)
         
         -- Connect to humanoid root part movement

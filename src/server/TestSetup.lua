@@ -17,7 +17,7 @@ function TestSetup:setupForTesting()
     print("Setting up The Ember Games for testing...")
     
     -- Override lobby settings to allow testing with fewer players
-    local Config = require(script.Parent.shared.Config)
+    local Config = require(script.Parent.Parent.shared.Config)
     Config.PLAYER_MIN = 1  -- Allow single player for testing
     
     -- Add a command to manually start the game for testing
@@ -54,9 +54,9 @@ function TestSetup:setupForTesting()
     
     -- Also automatically start when first player joins (for single player testing)
     Players.PlayerAdded:Connect(function(player)
-        wait(3) -- Wait for player to load in
+        task.wait(3) -- Wait for player to load in
         
-        if #LobbyService.lobbyPlayers == 0 then
+        if next(LobbyService.lobbyPlayers) == nil then
             -- First player, add them to lobby
             LobbyService.lobbyPlayers[player] = {
                 joinedTime = tick(),
@@ -69,7 +69,7 @@ function TestSetup:setupForTesting()
             lobbyRemoteEvent:FireClient(player, "ASSIGN_DISTRICT", 1)
             
             -- Manually start countdown after a delay for testing
-            wait(5)
+            task.wait(5)
             LobbyService:startMatchCountdown()
         end
     end)

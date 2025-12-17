@@ -184,7 +184,7 @@ function CombatGui:init()
     createCombatUI()
     
     -- Enable combat once player is ready
-    wait(2) -- Wait for other systems to initialize
+    task.wait(2) -- Wait for other systems to initialize
     CombatGui.combatEnabled = true
     if CombatGui.combatGui then
         CombatGui.combatGui.Enabled = true

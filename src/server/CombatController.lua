@@ -7,8 +7,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
-local Config = require(script.Parent.shared.Config)
-local PlayerStats = require(script.Parent.server.PlayerStats)
+local Config = require(script.Parent.Parent.shared.Config)
+local PlayerStats = require(script.Parent.PlayerStats)
 
 local CombatController = {}
 CombatController.activeWeapons = {}

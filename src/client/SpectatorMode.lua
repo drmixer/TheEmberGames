@@ -326,7 +326,7 @@ function SpectatorMode:init()
             
             if eliminatedUserId == Player.UserId then
                 -- This player was eliminated
-                wait(1) -- Wait a moment for the elimination to process
+                task.wait(1) -- Wait a moment for the elimination to process
                 SpectatorMode:enable()
             else
                 -- Another player was eliminated

@@ -6,7 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local Config = require(script.Parent.shared.Config)
+local Config = require(script.Parent.Parent.shared.Config)
 
 local InventoryController = {}
 InventoryController.playerInventories = {}
@@ -190,7 +190,7 @@ end
 -- Process item use based on item type
 function InventoryController:processItemUse(player, itemName, metadata)
     -- Import PlayerStats to modify player stats
-    local PlayerStats = require(script.Parent.server.PlayerStats)
+    local PlayerStats = require(script.Parent.PlayerStats)
     
     -- Item effects based on type
     local itemEffects = {

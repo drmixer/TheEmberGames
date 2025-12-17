@@ -207,4 +207,7 @@ function ControllerSupport:cleanup()
     end
 end
 
+-- Initialize ControllerSupport when the module is loaded
+ControllerSupport:init()
+
 return ControllerSupport

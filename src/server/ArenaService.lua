@@ -7,14 +7,15 @@ local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
-local Config = require(script.Parent.shared.Config)
-local CraftingRecipes = require(script.Parent.shared.CraftingRecipes)
+local Config = require(script.Parent.Parent.shared.Config)
+local CraftingRecipes = require(script.Parent.Parent.shared.CraftingRecipes)
 
 local ArenaService = {}
 ArenaService.arenaSetupComplete = false
 ArenaService.cornucopiaLootSpawned = false
 ArenaService.arenaBoundaries = {}
 ArenaService.biomeZones = {}
+ArenaService.cornucopiaModel = nil -- Store reference to Cornucopia
 
 -- RemoteEvents for client communication
 local arenaRemoteEvent = Instance.new("RemoteEvent")
@@ -199,6 +200,9 @@ local function createCornucopia()
     horn.Color = Color3.fromRGB(210, 180, 140)
     horn.Parent = Workspace
     
+    -- Store reference for loot spawning
+    ArenaService.cornucopiaModel = cornucopiaBase
+    
     print("Cornucopia landmark created")
 end
 
@@ -261,7 +265,7 @@ function ArenaService:spawnCornucopiaLoot()
             lootPart.Color = Color3.fromRGB(255, 255, 255) -- White
         end
         
-        lootPart.Parent = cornucopiaBase
+        lootPart.Parent = Workspace
         
         -- Add special visual effect for special items
         if lootItem.rarity == "high" then
@@ -275,14 +279,14 @@ function ArenaService:spawnCornucopiaLoot()
         billboardGui.Adornee = lootPart
         billboardGui.Parent = lootPart
         
-        localTextLabel = Instance.new("TextLabel")
-        localTextLabel.Size = UDim2.new(1, 0, 1, 0)
-        localTextLabel.Text = lootItem.name
-        localTextLabel.BackgroundTransparency = 1
-        localTextLabel.TextScaled = true
-        localTextLabel.Font = Enum.Font.Gotham
-        localTextLabel.TextColor3 = Color3.new(1, 1, 1)
-        localTextLabel.Parent = billboardGui
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.Text = lootItem.name
+        textLabel.BackgroundTransparency = 1
+        textLabel.TextScaled = true
+        textLabel.Font = Enum.Font.Gotham
+        textLabel.TextColor3 = Color3.new(1, 1, 1)
+        textLabel.Parent = billboardGui
     end
     
     ArenaService.cornucopiaLootSpawned = true

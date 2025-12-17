@@ -3,7 +3,7 @@
 
 local Workspace = game:GetService("Workspace")
 
-local Config = require(script.Parent.shared.Config)
+local Config = require(script.Parent.Parent.shared.Config)
 
 -- Create solid arena boundaries for development/testing
 local function createSolidArenaBoundaries()

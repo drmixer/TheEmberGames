@@ -109,7 +109,8 @@ local function populateRecipeList()
     
     -- Add recipes
     local recipeY = 0
-    local recipes = require(script.Parent.shared.CraftingRecipes).recipes
+    local CraftingRecipes = require(game:GetService("ReplicatedFirst").CraftingRecipes)
+    local recipes = CraftingRecipes.recipes
     
     for recipeName, recipeData in pairs(recipes) do
         local recipeButton = Instance.new("TextButton")

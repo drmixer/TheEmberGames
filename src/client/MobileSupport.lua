@@ -203,4 +203,7 @@ function MobileSupport:createMobileControls()
     print("Mobile controls created")
 end
 
+-- Initialize MobileSupport when the module is loaded
+MobileSupport:init()
+
 return MobileSupport

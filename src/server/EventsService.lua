@@ -7,8 +7,8 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
-local Config = require(script.Parent.shared.Config)
-local PlayerStats = require(script.Parent.server.PlayerStats)
+local Config = require(script.Parent.Parent.shared.Config)
+local PlayerStats = require(script.Parent.PlayerStats)
 
 local EventsService = {}
 EventsService.activeMatch = false
@@ -59,7 +59,7 @@ function EventsService:activateStormPhase(phase)
         else nextPhaseTime = 60 -- 1 minute for final phases
         end
         
-        wait(nextPhaseTime)
+        task.wait(nextPhaseTime)
         EventsService:activateStormPhase(phase + 1)
     end
 end
@@ -87,17 +87,17 @@ function EventsService:deploySupplyDrop()
     eventsRemoteEvent:FireAllClients("SUPPLY_DROP_DEPLOYED", position)
     
     -- Simulate parachute drop
-    wait(8) -- Time for drop to reach ground
+    task.wait(8) -- Time for drop to reach ground
     
     -- Activate supply drop location
     eventsRemoteEvent:FireAllClients("SUPPLY_DROP_LANDED", position)
     
     -- Mark as inactive after a period
-    wait(300) -- Supply drop stays active for 5 minutes
+    task.wait(300) -- Supply drop stays active for 5 minutes
     EventsService.supplyDropActive = false
     
     -- Schedule next supply drop randomly
-    wait(math.random(300, 600)) -- 5-10 minutes until next drop
+    task.wait(math.random(300, 600)) -- 5-10 minutes until next drop
     EventsService:deploySupplyDrop()
 end
 
@@ -166,17 +166,17 @@ function EventsService:initializeMatch()
     print("Initializing match events...")
     
     -- Start storm progression after a delay
-    wait(300) -- Wait 5 minutes before first storm phase
+    task.wait(300) -- Wait 5 minutes before first storm phase
     EventsService:activateStormPhase(1)
     
     -- Start periodic supply drops after a delay
-    wait(120) -- First supply drop after 2 minutes
+    task.wait(120) -- First supply drop after 2 minutes
     EventsService:deploySupplyDrop()
     
     -- Schedule random hazard events during match
     coroutine.wrap(function()
         while EventsService.activeMatch do
-            wait(math.random(240, 480)) -- 4-8 minutes between hazard events
+            task.wait(math.random(240, 480)) -- 4-8 minutes between hazard events
             
             if EventsService.activeMatch then
                 local hazardTypes = {"FLOOD", "POISON_FOG", "WILDFIRE"}

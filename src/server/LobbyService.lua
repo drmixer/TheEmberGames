@@ -7,8 +7,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local Config = require(script.Parent.shared.Config)
-local EventsService = require(script.Parent.server.EventsService)
+local Config = require(script.Parent.Parent.shared.Config)
+local EventsService = require(script.Parent.EventsService)
 
 local LobbyService = {}
 LobbyService.lobbyPlayers = {}
@@ -16,6 +16,15 @@ LobbyService.gameState = "WaitingForPlayers" -- WaitingForPlayers, CountingDown,
 LobbyService.countdownTime = 0
 LobbyService.matchStartTime = 0
 LobbyService.currentMatchId = 0
+
+-- Helper function to count players in dictionary
+local function countLobbyPlayers()
+    local count = 0
+    for _ in pairs(LobbyService.lobbyPlayers) do
+        count = count + 1
+    end
+    return count
+end
 
 -- RemoteEvents for client communication
 local lobbyRemoteEvent = Instance.new("RemoteEvent")
@@ -27,7 +36,7 @@ local function addPlayerToLobby(player)
     if not LobbyService.lobbyPlayers[player] then
         LobbyService.lobbyPlayers[player] = {
             joinedTime = tick(),
-            districtNumber = #LobbyService.lobbyPlayers + 1,
+            districtNumber = countLobbyPlayers() + 1,
             ready = false
         }
         
@@ -44,7 +53,7 @@ local function removePlayerFromLobby(player)
         print("Player " .. player.Name .. " left lobby")
         
         -- Check if match should be stopped
-        if LobbyService.gameState ~= "WaitingForPlayers" and #LobbyService.lobbyPlayers < Config.PLAYER_MIN then
+        if LobbyService.gameState ~= "WaitingForPlayers" and countLobbyPlayers() < Config.PLAYER_MIN then
             LobbyService:cancelMatch()
         end
     end
@@ -56,8 +65,9 @@ function LobbyService:startMatchCountdown()
         return
     end
     
-    if #LobbyService.lobbyPlayers < Config.PLAYER_MIN then
-        print("Not enough players to start match. Need " .. Config.PLAYER_MIN .. ", have " .. #LobbyService.lobbyPlayers)
+    local playerCount = countLobbyPlayers()
+    if playerCount < Config.PLAYER_MIN then
+        print("Not enough players to start match. Need " .. Config.PLAYER_MIN .. ", have " .. playerCount)
         return
     end
     
@@ -97,7 +107,7 @@ function LobbyService:beginMatch()
     LobbyService.gameState = "InProgress"
     LobbyService.matchStartTime = tick()
     
-    print("Match beginning with " .. #LobbyService.lobbyPlayers .. " players")
+    print("Match beginning with " .. countLobbyPlayers() .. " players")
     
     -- Notify all players match is starting
     lobbyRemoteEvent:FireAllClients("MATCH_STARTING", LobbyService.currentMatchId)
@@ -122,8 +132,8 @@ local function onPlayerAdded(player)
     addPlayerToLobby(player)
     
     -- Check if we have enough players to start countdown automatically
-    if LobbyService.gameState == "WaitingForPlayers" and #LobbyService.lobbyPlayers >= Config.PLAYER_MIN then
-        wait(2) -- Brief delay to allow more players to join
+    if LobbyService.gameState == "WaitingForPlayers" and countLobbyPlayers() >= Config.PLAYER_MIN then
+        task.wait(2) -- Brief delay to allow more players to join
         LobbyService:startMatchCountdown()
     end
     
@@ -163,7 +173,7 @@ function LobbyService.init()
                     end
                 end
                 
-                if allReady and LobbyService.gameState == "WaitingForPlayers" and #LobbyService.lobbyPlayers >= Config.PLAYER_MIN then
+                if allReady and LobbyService.gameState == "WaitingForPlayers" and countLobbyPlayers() >= Config.PLAYER_MIN then
                     LobbyService:startMatchCountdown()
                 end
             end
@@ -172,7 +182,7 @@ function LobbyService.init()
             local status = {
                 gameState = LobbyService.gameState,
                 countdownTime = LobbyService.countdownTime,
-                playerCount = #LobbyService.lobbyPlayers,
+                playerCount = countLobbyPlayers(),
                 minPlayers = Config.PLAYER_MIN,
                 matchId = LobbyService.currentMatchId
             }
@@ -180,7 +190,7 @@ function LobbyService.init()
         end
     end)
     
-    print("LobbyService initialized with " .. #LobbyService.lobbyPlayers .. " players")
+    print("LobbyService initialized with " .. countLobbyPlayers() .. " players")
 end
 
 return LobbyService

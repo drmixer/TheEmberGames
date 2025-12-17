@@ -2,55 +2,22 @@
   "name": "The Ember Games",
   "tree": {
     "$className": "DataModel",
+    "ReplicatedFirst": {
+      "$path": "src/shared"
+    },
     "ReplicatedStorage": {
-      "$path": "src/ReplicatedStorage"
+      "$className": "ReplicatedStorage"
     },
     "ServerScriptService": {
-      "$path": "src/server",
-      "ServerMain": {
-        "$path": "src/server/ServerMain.lua"
-      },
-      "DevelopmentSetup": {
-        "$path": "src/server/DevelopmentSetup.lua"
-      },
-      "DevelopmentArenaService": {
-        "$path": "src/server/DevelopmentArenaService.lua"
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/server"
       }
     },
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "$path": "src/client",
-        "StarterGui": {
-          "$path": "src/client/StarterGui.lua"
-        },
-        "UIController": {
-          "$path": "src/client/UIController.lua"
-        },
-        "EmoteController": {
-          "$path": "src/client/EmoteController.lua"
-        },
-        "CraftingGui": {
-          "$path": "src/client/CraftingGui.lua"
-        },
-        "CombatGui": {
-          "$path": "src/client/CombatGui.lua"
-        },
-        "InventoryGui": {
-          "$path": "src/client/InventoryGui.lua"
-        },
-        "SpectatorMode": {
-          "$path": "src/client/SpectatorMode.lua"
-        },
-        "ControllerSupport": {
-          "$path": "src/client/ControllerSupport.lua"
-        },
-        "MobileSupport": {
-          "$path": "src/client/MobileSupport.lua"
-        }
+        "$path": "src/client"
       }
-    },
-    "ReplicatedFirst": {
-      "$path": "src/shared"
     },
     "Workspace": {
       "$properties": {
@@ -62,13 +29,11 @@
     },
     "Lighting": {
       "$properties": {
-        "Ambient": [
-          0,
-          0,
-          0
-        ],
+        "Ambient": [0.1, 0.1, 0.1],
         "Brightness": 2,
-        "GlobalShadows": true
+        "GlobalShadows": true,
+        "OutdoorAmbient": [0.3, 0.3, 0.3],
+        "ClockTime": 14
       }
     },
     "SoundService": {
