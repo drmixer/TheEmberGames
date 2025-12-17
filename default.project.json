@@ -15,8 +15,12 @@
       }
     },
     "StarterPlayer": {
+      "$className": "StarterPlayer",
       "StarterPlayerScripts": {
-        "$path": "src/client"
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/client"
+        }
       }
     },
     "Workspace": {
@@ -29,10 +33,18 @@
     },
     "Lighting": {
       "$properties": {
-        "Ambient": [0.1, 0.1, 0.1],
+        "Ambient": [
+          0.1,
+          0.1,
+          0.1
+        ],
         "Brightness": 2,
         "GlobalShadows": true,
-        "OutdoorAmbient": [0.3, 0.3, 0.3],
+        "OutdoorAmbient": [
+          0.3,
+          0.3,
+          0.3
+        ],
         "ClockTime": 14
       }
     },
