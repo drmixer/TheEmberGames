@@ -10,7 +10,8 @@ local Debris = game:GetService("Debris")
 
 local LobbyService = require(script.Parent.LobbyService)
 local PlayerStats = require(script.Parent.PlayerStats)
-local Config = require(script.Parent.Parent.shared.Config)
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local Config = require(ReplicatedFirst.Config)
 
 local CharacterSpawner = {}
 CharacterSpawner.spawnPositions = {}

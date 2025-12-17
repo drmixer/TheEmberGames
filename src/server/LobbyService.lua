@@ -7,7 +7,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local Config = require(script.Parent.Parent.shared.Config)
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local Config = require(ReplicatedFirst.Config)
 local EventsService = require(script.Parent.EventsService)
 
 local LobbyService = {}

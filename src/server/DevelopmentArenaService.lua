@@ -3,7 +3,8 @@
 
 local Workspace = game:GetService("Workspace")
 
-local Config = require(script.Parent.Parent.shared.Config)
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local Config = require(ReplicatedFirst.Config)
 
 -- Create solid arena boundaries for development/testing
 local function createSolidArenaBoundaries()

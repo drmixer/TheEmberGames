@@ -7,8 +7,9 @@ local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
-local Config = require(script.Parent.Parent.shared.Config)
-local CraftingRecipes = require(script.Parent.Parent.shared.CraftingRecipes)
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local Config = require(ReplicatedFirst.Config)
+local CraftingRecipes = require(ReplicatedFirst.CraftingRecipes)
 
 local ArenaService = {}
 ArenaService.arenaSetupComplete = false

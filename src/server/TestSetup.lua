@@ -17,7 +17,8 @@ function TestSetup:setupForTesting()
     print("Setting up The Ember Games for testing...")
     
     -- Override lobby settings to allow testing with fewer players
-    local Config = require(script.Parent.Parent.shared.Config)
+    local ReplicatedFirst = game:GetService("ReplicatedFirst")
+    local Config = require(ReplicatedFirst.Config)
     Config.PLAYER_MIN = 1  -- Allow single player for testing
     
     -- Add a command to manually start the game for testing

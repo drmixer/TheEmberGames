@@ -6,8 +6,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local CraftingRecipes = require(script.Parent.Parent.shared.CraftingRecipes)
-local Config = require(script.Parent.Parent.shared.Config)
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local CraftingRecipes = require(ReplicatedFirst.CraftingRecipes)
+local Config = require(ReplicatedFirst.Config)
 
 local CraftingController = {}
 
