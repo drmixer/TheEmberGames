@@ -11,16 +11,31 @@ local Player = Players.LocalPlayer
 -- Wait for the player's GUI to be ready
 Player:WaitForChild("PlayerGui")
 
--- Load all client modules (they auto-initialize on require)
--- Note: script refers to the client folder, so children are accessed directly
-local StarterGui = require(script.StarterGui)
-local UIController = require(script.UIController)
-local EmoteController = require(script.EmoteController)
-local CraftingGui = require(script.CraftingGui)
-local CombatGui = require(script.CombatGui)
-local InventoryGui = require(script.InventoryGui)
-local SpectatorMode = require(script.SpectatorMode)
-local ControllerSupport = require(script.ControllerSupport)
-local MobileSupport = require(script.MobileSupport)
+-- Load client modules one at a time with error handling
+local function safeRequire(moduleName)
+    local success, result = pcall(function()
+        return require(script[moduleName])
+    end)
+    if success then
+        print("Loaded: " .. moduleName)
+        return result
+    else
+        warn("Failed to load " .. moduleName .. ": " .. tostring(result))
+        return nil
+    end
+end
+
+-- Load core UI first
+safeRequire("UIController")
+safeRequire("StarterGui")
+
+-- Load other client modules
+safeRequire("EmoteController")
+safeRequire("CraftingGui")
+safeRequire("CombatGui")
+safeRequire("InventoryGui")
+safeRequire("SpectatorMode")
+safeRequire("ControllerSupport")
+safeRequire("MobileSupport")
 
 print("The Ember Games client started successfully!")
