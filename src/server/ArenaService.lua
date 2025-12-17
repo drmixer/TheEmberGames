@@ -392,7 +392,7 @@ end
 
 -- Initialize arena service
 function ArenaService.init()
-    print("ArenaService initialized")
+    print("[ArenaService] Initializing...")
     
     -- Set up biome zones
     setupBiomeZones()
@@ -406,9 +406,21 @@ function ArenaService.init()
     -- Create Cornucopia landmark
     createCornucopia()
     
+    -- Generate terrain decorations for all biomes
+    local success, TerrainGenerator = pcall(function()
+        return require(script.Parent.TerrainGenerator)
+    end)
+    
+    if success and TerrainGenerator then
+        TerrainGenerator.init()
+        TerrainGenerator:generateAllTerrain(ArenaService.biomeZones)
+    else
+        warn("[ArenaService] TerrainGenerator not available - using basic arena")
+    end
+    
     ArenaService.arenaSetupComplete = true
     
-    print("Arena setup complete")
+    print("[ArenaService] Arena setup complete")
     
     -- Handle remote events from other services
     arenaRemoteEvent.OnServerEvent:Connect(function(player, action, ...)

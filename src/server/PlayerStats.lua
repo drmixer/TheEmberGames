@@ -9,6 +9,12 @@ local RunService = game:GetService("RunService")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Config = require(ReplicatedFirst.Config)
 
+-- Try to load BalanceConfig for tunable values
+local BalanceConfig = nil
+pcall(function()
+    BalanceConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("shared"):WaitForChild("BalanceConfig", 2))
+end)
+
 local PlayerStats = {}
 PlayerStats.playerStats = {}
 PlayerStats.statsUpdateConnection = nil
@@ -17,6 +23,14 @@ PlayerStats.statsUpdateConnection = nil
 local statsRemoteEvent = Instance.new("RemoteEvent")
 statsRemoteEvent.Name = "StatsRemoteEvent"
 statsRemoteEvent.Parent = ReplicatedStorage
+
+-- Get survival values (from BalanceConfig if available, otherwise defaults)
+local function getSurvivalValue(key, default)
+    if BalanceConfig and BalanceConfig.Survival and BalanceConfig.Survival[key] then
+        return BalanceConfig.Survival[key]
+    end
+    return default
+end
 
 -- Initialize player stats
 local function initializePlayerStats(player)
@@ -27,9 +41,16 @@ local function initializePlayerStats(player)
         maxHealth = Config.MAX_HEALTH,
         maxHunger = Config.MAX_HUNGER,
         maxThirst = Config.MAX_THIRST,
-        healthRegenRate = 0, -- HP per second
-        hungerDrainRate = 1/45, -- per second during activity
-        thirstDrainRate = 1/30, -- per second during activity
+        healthRegenRate = getSurvivalValue("HEALTH_REGEN_RATE", 0.5), -- HP per second
+        hungerDrainRate = getSurvivalValue("HUNGER_DRAIN_ACTIVE", 1/45), -- per second during activity
+        thirstDrainRate = getSurvivalValue("THIRST_DRAIN_ACTIVE", 1/30), -- per second during activity
+        hungerDrainIdle = getSurvivalValue("HUNGER_DRAIN_IDLE", 1/90), -- per second when idle
+        thirstDrainIdle = getSurvivalValue("THIRST_DRAIN_IDLE", 1/60), -- per second when idle
+        healthDrainRate = getSurvivalValue("HEALTH_DRAIN_RATE", 0.5), -- HP per second when starving
+        hungerCritical = getSurvivalValue("HUNGER_CRITICAL", 25), -- HP drain threshold
+        thirstCritical = getSurvivalValue("THIRST_CRITICAL", 25), -- HP drain threshold
+        hungerHealthy = getSurvivalValue("HUNGER_HEALTHY", 50), -- Regen threshold
+        thirstHealthy = getSurvivalValue("THIRST_HEALTHY", 50), -- Regen threshold
         statusEffects = {}, -- Active status effects like poison, bleeding
         lastUpdate = tick(),
         lastActivity = tick()
@@ -134,53 +155,90 @@ function PlayerStats:removeStatusEffect(player, effectName)
 end
 
 -- Player eliminated
-function PlayerStats:playerEliminated(player)
+function PlayerStats:playerEliminated(player, killer)
     if not PlayerStats.playerStats[player] then
         return
     end
     
-    print("Player " .. player.Name .. " has been eliminated")
+    print("[PlayerStats] Player " .. player.Name .. " has been eliminated")
     
-    -- Notify clients
-    statsRemoteEvent:FireAllClients("PLAYER_ELIMINATED", player.UserId, player.Name)
-    
-    -- Remove player's stats
+    -- Remove player's stats first to prevent re-triggering
     PlayerStats.playerStats[player] = nil
     
-    -- Play elimination effects via EventsService or similar
+    -- Notify MatchService about elimination (handles cannon sound, victory check, etc.)
+    local success, MatchService = pcall(function()
+        return require(script.Parent.MatchService)
+    end)
+    
+    if success and MatchService then
+        MatchService:eliminatePlayer(player, killer)
+    else
+        -- Fallback: notify clients directly
+        statsRemoteEvent:FireAllClients("PLAYER_ELIMINATED", player.UserId, player.Name)
+    end
 end
 
 -- Update player stats for survival systems
 local function updatePlayerStats()
     local currentTime = tick()
     
+    -- Get combat balance values (status effect damage)
+    local bleedDamage = 2
+    local bleedInterval = 2
+    local poisonDamage = 3
+    local poisonInterval = 1.5
+    local hypothermiaDamage = 1
+    local hypothermiaInterval = 5
+    
+    if BalanceConfig and BalanceConfig.Combat then
+        bleedDamage = BalanceConfig.Combat.BLEED_DAMAGE_PER_TICK or bleedDamage
+        bleedInterval = BalanceConfig.Combat.BLEED_TICK_INTERVAL or bleedInterval
+        poisonDamage = BalanceConfig.Combat.POISON_DAMAGE_PER_TICK or poisonDamage
+        poisonInterval = BalanceConfig.Combat.POISON_TICK_INTERVAL or poisonInterval
+        hypothermiaDamage = BalanceConfig.Combat.HYPOTHERMIA_DAMAGE_PER_TICK or hypothermiaDamage
+        hypothermiaInterval = BalanceConfig.Combat.HYPOTHERMIA_TICK_INTERVAL or hypothermiaInterval
+    end
+    
     for player, stats in pairs(PlayerStats.playerStats) do
         if player and player.Parent then -- Make sure player still exists
             local timeDelta = currentTime - stats.lastUpdate
             
             if timeDelta > 0 then
+                -- Check if player is idle (no activity for 10+ seconds)
+                local isIdle = (currentTime - stats.lastActivity) > 10
+                
                 -- Update hunger based on activity
-                local hungerDrain = stats.hungerDrainRate * timeDelta
-                if currentTime - stats.lastActivity > 10 then -- If inactive for 10+ seconds
-                    hungerDrain = hungerDrain * 0.5 -- Reduced drain when inactive
+                local hungerDrain
+                if isIdle then
+                    hungerDrain = (stats.hungerDrainIdle or stats.hungerDrainRate * 0.5) * timeDelta
+                else
+                    hungerDrain = stats.hungerDrainRate * timeDelta
                 end
                 PlayerStats:updateStat(player, "hunger", -hungerDrain, true)
                 
                 -- Update thirst based on activity
-                local thirstDrain = stats.thirstDrainRate * timeDelta
-                if currentTime - stats.lastActivity > 10 then -- If inactive for 10+ seconds
-                    thirstDrain = thirstDrain * 0.7 -- Reduced drain when inactive
+                local thirstDrain
+                if isIdle then
+                    thirstDrain = (stats.thirstDrainIdle or stats.thirstDrainRate * 0.7) * timeDelta
+                else
+                    thirstDrain = stats.thirstDrainRate * timeDelta
                 end
                 PlayerStats:updateStat(player, "thirst", -thirstDrain, true)
                 
-                -- Health regeneration depends on hunger and thirst levels
-                if stats.hunger > 50 and stats.thirst > 50 then
-                    -- Natural regeneration
+                -- Health regeneration/deterioration based on hunger and thirst levels
+                local hungerHealthy = stats.hungerHealthy or 50
+                local thirstHealthy = stats.thirstHealthy or 50
+                local hungerCritical = stats.hungerCritical or 25
+                local thirstCritical = stats.thirstCritical or 25
+                local healthDrainRate = stats.healthDrainRate or 0.5
+                
+                if stats.hunger > hungerHealthy and stats.thirst > thirstHealthy then
+                    -- Natural regeneration when well-fed and hydrated
                     local healthRegen = stats.healthRegenRate * timeDelta
                     PlayerStats:updateStat(player, "health", healthRegen, true)
-                elseif stats.hunger <= 25 or stats.thirst <= 25 then
-                    -- Health deterioration at low survival stats
-                    PlayerStats:updateStat(player, "health", -timeDelta * 0.5, true)
+                elseif stats.hunger <= hungerCritical or stats.thirst <= thirstCritical then
+                    -- Health deterioration at critically low survival stats
+                    PlayerStats:updateStat(player, "health", -timeDelta * healthDrainRate, true)
                 end
                 
                 -- Apply status effects
@@ -192,21 +250,37 @@ local function updatePlayerStats()
                             -- Effect duration ended
                             PlayerStats:removeStatusEffect(player, effectName)
                         else
-                            -- Apply ongoing effect damage/healing
+                            -- Apply ongoing effect damage/healing using balance config values
                             if effectName == "BLEEDING" then
-                                -- Bleeding: 2 HP every 2 seconds
-                                if math.floor(effectTime * 10) % 20 == 0 then
-                                    PlayerStats:applyDamage(player, 2 * effectData.intensity, "BLEEDING")
+                                -- Bleeding: damage every interval
+                                local tickCheck = math.floor(effectTime / bleedInterval)
+                                local lastTickCheck = math.floor((effectTime - timeDelta) / bleedInterval)
+                                if tickCheck > lastTickCheck then
+                                    PlayerStats:applyDamage(player, bleedDamage * effectData.intensity, "BLEEDING")
                                 end
                             elseif effectName == "POISON" then
-                                -- Poison: 3 HP every 1.5 seconds
-                                if math.floor(effectTime * 10) % 15 == 0 then
-                                    PlayerStats:applyDamage(player, 3 * effectData.intensity, "POISON")
+                                -- Poison: damage every interval
+                                local tickCheck = math.floor(effectTime / poisonInterval)
+                                local lastTickCheck = math.floor((effectTime - timeDelta) / poisonInterval)
+                                if tickCheck > lastTickCheck then
+                                    PlayerStats:applyDamage(player, poisonDamage * effectData.intensity, "POISON")
                                 end
                             elseif effectName == "HYPOTHERMIA" then
-                                -- Hypothermia: 1 HP every 5 seconds
-                                if math.floor(effectTime) % 5 == 0 then
-                                    PlayerStats:applyDamage(player, 1 * effectData.intensity, "HYPOTHERMIA")
+                                -- Hypothermia: damage every interval
+                                local tickCheck = math.floor(effectTime / hypothermiaInterval)
+                                local lastTickCheck = math.floor((effectTime - timeDelta) / hypothermiaInterval)
+                                if tickCheck > lastTickCheck then
+                                    PlayerStats:applyDamage(player, hypothermiaDamage * effectData.intensity, "HYPOTHERMIA")
+                                end
+                            elseif effectName == "IMMOBILIZE" then
+                                -- Immobilize: player can't move (handled client-side)
+                                -- Just track duration here
+                            elseif effectName == "BURNING" then
+                                -- Burning: fire damage
+                                local tickCheck = math.floor(effectTime / 1)
+                                local lastTickCheck = math.floor((effectTime - timeDelta) / 1)
+                                if tickCheck > lastTickCheck then
+                                    PlayerStats:applyDamage(player, 5 * effectData.intensity, "BURNING")
                                 end
                             end
                         end

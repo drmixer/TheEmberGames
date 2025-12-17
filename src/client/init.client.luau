@@ -25,9 +25,25 @@ local function safeRequire(moduleName)
     end
 end
 
--- Load core UI first
+-- Phase 6: Loading screen (load first for immediate visual)
+safeRequire("LoadingScreen")
+
+-- Load core UI
 safeRequire("UIController")
 safeRequire("StarterGui")
+safeRequire("VictoryUI")
+safeRequire("CombatFeedback")
+safeRequire("CountdownUI")
+safeRequire("WeaponEffects")
+safeRequire("AudioController")
+
+-- Load Phase 3: Immersion modules
+safeRequire("NightSkyTributes")
+safeRequire("SupplyDropVisuals")
+safeRequire("HazardVisuals")
+
+-- Load Phase 4: Weapons & Combat
+safeRequire("WeaponController")
 
 -- Load other client modules
 safeRequire("EmoteController")
@@ -38,4 +54,14 @@ safeRequire("SpectatorMode")
 safeRequire("ControllerSupport")
 safeRequire("MobileSupport")
 
-print("The Ember Games client started successfully!")
+-- Phase 5: Testing & Admin tools
+safeRequire("AdminPanel")
+
+-- Phase 6: Polish & Cosmetics
+safeRequire("TrailEffects")
+safeRequire("VictoryPoses")
+safeRequire("AllianceUI")
+
+print("[Client] The Ember Games client started successfully!")
+print("[Client] Press F8 to toggle Admin Panel for testing")
+print("[Client] Press G for emotes, P for alliances")

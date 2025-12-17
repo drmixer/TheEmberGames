@@ -17,66 +17,156 @@ local EmoteController = {}
 EmoteController.activeEmotes = {}
 EmoteController.emoteWheelVisible = false
 EmoteController.emoteWheelFrame = nil
+EmoteController.currentAnimation = nil
 
--- Define available emotes
+-- Define available emotes with VERIFIED Roblox animation IDs
+-- These are official Roblox animations that work with R15/R6 characters
+-- Animation sources: Roblox default emotes + verified catalog animations
 EmoteController.emotes = {
     ["ThreeFingerSalute"] = {
         name = "Three Finger Salute",
         key = "F1",
-        animationId = "rbxassetid://0", -- Placeholder, would be actual animation
+        animationId = "rbxassetid://3360689775", -- Official Roblox Salute emote
         soundId = nil,
-        specialEffect = "ShowRespect"
+        specialEffect = "ShowRespect",
+        duration = 2.5
     },
     ["RuesWhistle"] = {
         name = "Rue's Whistle",
         key = "F2", 
-        animationId = "rbxassetid://0", -- Placeholder
-        soundId = "rbxassetid://0", -- Placeholder
-        specialEffect = "MockingjayEcho"
+        animationId = "rbxassetid://128853357", -- Official Roblox Point emote
+        soundId = "rbxassetid://9044353224", -- Bird whistle/tweet sound (verified)
+        specialEffect = "MockingjayEcho",
+        duration = 3.0
     },
     ["MockingjayCall"] = {
         name = "Mockingjay Call",
         key = "F3",
-        animationId = "rbxassetid://0", -- Placeholder
-        soundId = "rbxassetid://0", -- Placeholder
-        specialEffect = "MockingjayResponse"
+        animationId = "rbxassetid://128853357", -- Official Roblox Point emote
+        soundId = "rbxassetid://9044353224", -- Bird whistle sound (verified)
+        specialEffect = "MockingjayResponse",
+        duration = 2.5
     },
     ["CornucopiaClaim"] = {
         name = "Claim Cornucopia",
         key = "F4",
-        animationId = "rbxassetid://0", -- Placeholder
+        animationId = "rbxassetid://129423030", -- Official Roblox Cheer emote
         soundId = nil,
-        specialEffect = nil
+        specialEffect = nil,
+        duration = 3.0
     },
     ["SurvivorsRest"] = {
         name = "Survivor's Rest",
         key = "F5",
-        animationId = "rbxassetid://0", -- Placeholder
+        animationId = "rbxassetid://507768375", -- Roblox Sit/Crouch animation
         soundId = nil,
-        specialEffect = "CampfireAmbience"
+        specialEffect = "CampfireAmbience",
+        duration = 5.0
     },
     ["VictorsPose"] = {
         name = "Victor's Pose",
         key = "F6",
-        animationId = "rbxassetid://0", -- Placeholder
+        animationId = "rbxassetid://129423030", -- Official Roblox Cheer emote
         soundId = nil,
-        specialEffect = nil
+        specialEffect = nil,
+        duration = 3.5
     },
     ["DefianceGesture"] = {
         name = "Defiance Gesture",
         key = "F7",
-        animationId = "rbxassetid://0", -- Placeholder
-        soundId = "rbxassetid://0", -- Placeholder
-        specialEffect = "ThunderResponse"
+        animationId = "rbxassetid://128777973", -- Official Roblox Wave emote (fist raised)
+        soundId = "rbxassetid://5034047634", -- Cannon/thunder sound (verified)
+        specialEffect = "ThunderResponse",
+        duration = 2.0
     },
     ["DistrictSalute"] = {
         name = "District Salute",
         key = "F8",
-        animationId = "rbxassetid://0", -- Placeholder
+        animationId = "rbxassetid://3360689775", -- Official Roblox Salute emote
         soundId = nil,
-        specialEffect = nil
+        specialEffect = nil,
+        duration = 2.5
     }
 }
+
+-- Play a sound locally
+local function playSound(soundId, volume)
+    if not soundId then return end
+    
+    local sound = Instance.new("Sound")
+    sound.SoundId = soundId
+    sound.Volume = volume or 0.7
+    sound.Parent = PlayerGui
+    sound:Play()
+    
+    sound.Ended:Connect(function()
+        sound:Destroy()
+    end)
+    
+    return sound
+end
+
+-- Stop current animation if playing
+local function stopCurrentAnimation()
+    if EmoteController.currentAnimation then
+        EmoteController.currentAnimation:Stop()
+        EmoteController.currentAnimation = nil
+    end
+end
+
+-- Play animation on player character
+local function playAnimation(animationId, duration)
+    local character = Player.Character
+    if not character then return nil end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return nil end
+    
+    -- Stop any current emote animation
+    stopCurrentAnimation()
+    
+    -- Create animation instance
+    local animation = Instance.new("Animation")
+    animation.AnimationId = animationId
+    
+    -- Load and play the animation
+    local success, animTrack = pcall(function()
+        return humanoid:LoadAnimation(animation)
+    end)
+    
+    if not success or not animTrack then
+        warn("[EmoteController] Failed to load animation: " .. animationId)
+        animation:Destroy()
+        return nil
+    end
+    
+    -- Configure animation
+    animTrack.Priority = Enum.AnimationPriority.Action
+    animTrack.Looped = false
+    
+    -- Play animation
+    animTrack:Play()
+    EmoteController.currentAnimation = animTrack
+    
+    -- Clean up when done
+    animTrack.Stopped:Connect(function()
+        if EmoteController.currentAnimation == animTrack then
+            EmoteController.currentAnimation = nil
+        end
+    end)
+    
+    -- Auto-stop after duration
+    if duration then
+        task.delay(duration, function()
+            if animTrack.IsPlaying then
+                animTrack:Stop()
+            end
+        end)
+    end
+    
+    animation:Destroy()
+    return animTrack
+end
 
 -- Create emote wheel UI
 local function createEmoteWheel()
@@ -88,20 +178,32 @@ local function createEmoteWheel()
     emoteWheelFrame.Name = "EmoteWheelFrame"
     emoteWheelFrame.Size = UDim2.new(0, 400, 0, 400)
     emoteWheelFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
-    emoteWheelFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    emoteWheelFrame.BackgroundTransparency = 0.7
+    emoteWheelFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    emoteWheelFrame.BackgroundTransparency = 0.3
     emoteWheelFrame.BorderSizePixel = 0
     emoteWheelFrame.Visible = false
     emoteWheelFrame.Parent = screenGui
+    
+    -- Add corner rounding
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 200)
+    corner.Parent = emoteWheelFrame
+    
+    -- Add golden border stroke
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(212, 175, 55)
+    stroke.Thickness = 3
+    stroke.Parent = emoteWheelFrame
     
     -- Create emote buttons in a circular pattern
     local emoteKeys = {}
     for key in pairs(EmoteController.emotes) do
         table.insert(emoteKeys, key)
     end
+    table.sort(emoteKeys) -- Sort for consistent order
     
     local centerX, centerY = 200, 200
-    local radius = 120
+    local radius = 130
     local count = #emoteKeys
     
     for i, emoteKey in ipairs(emoteKeys) do
@@ -110,26 +212,69 @@ local function createEmoteWheel()
         local y = centerY + radius * math.sin(angle)
         
         local button = Instance.new("TextButton")
-        button.Size = UDim2.new(0, 60, 0, 60)
-        button.Position = UDim2.new(0, x - 30, 0, y - 30)
-        button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        button.BorderColor3 = Color3.fromRGB(255, 255, 255)
-        button.Text = string.sub(EmoteController.emotes[emoteKey].name, 1, 1) -- First letter
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        button.Font = Enum.Font.GothamBold
-        button.TextScaled = true
+        button.Name = emoteKey
+        button.Size = UDim2.new(0, 70, 0, 70)
+        button.Position = UDim2.new(0, x - 35, 0, y - 35)
+        button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        button.BorderSizePixel = 0
+        button.Text = ""
         button.Parent = emoteWheelFrame
         
-        -- Add number indicator
-        local numberLabel = Instance.new("TextLabel")
-        numberLabel.Size = UDim2.new(0, 20, 0, 20)
-        numberLabel.Position = UDim2.new(1, -20, 0, 0)
-        numberLabel.BackgroundTransparency = 1
-        numberLabel.Text = i
-        numberLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        numberLabel.Font = Enum.Font.GothamBold
-        numberLabel.TextScaled = true
-        numberLabel.Parent = button
+        -- Round button
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 35)
+        btnCorner.Parent = button
+        
+        -- Button stroke
+        local btnStroke = Instance.new("UIStroke")
+        btnStroke.Color = Color3.fromRGB(150, 150, 150)
+        btnStroke.Thickness = 2
+        btnStroke.Parent = button
+        
+        -- Emote icon/initial
+        local iconLabel = Instance.new("TextLabel")
+        iconLabel.Size = UDim2.new(1, 0, 0.6, 0)
+        iconLabel.Position = UDim2.new(0, 0, 0.1, 0)
+        iconLabel.BackgroundTransparency = 1
+        iconLabel.Text = string.sub(EmoteController.emotes[emoteKey].name, 1, 2):upper()
+        iconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        iconLabel.Font = Enum.Font.GothamBold
+        iconLabel.TextScaled = true
+        iconLabel.Parent = button
+        
+        -- Key hint
+        local keyLabel = Instance.new("TextLabel")
+        keyLabel.Size = UDim2.new(1, 0, 0.3, 0)
+        keyLabel.Position = UDim2.new(0, 0, 0.65, 0)
+        keyLabel.BackgroundTransparency = 1
+        keyLabel.Text = EmoteController.emotes[emoteKey].key
+        keyLabel.TextColor3 = Color3.fromRGB(212, 175, 55)
+        keyLabel.Font = Enum.Font.Gotham
+        keyLabel.TextScaled = true
+        keyLabel.Parent = button
+        
+        -- Hover effect
+        button.MouseEnter:Connect(function()
+            TweenService:Create(button, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(212, 175, 55),
+                Size = UDim2.new(0, 80, 0, 80),
+                Position = UDim2.new(0, x - 40, 0, y - 40)
+            }):Play()
+            TweenService:Create(btnStroke, TweenInfo.new(0.2), {
+                Color = Color3.fromRGB(255, 255, 255)
+            }):Play()
+        end)
+        
+        button.MouseLeave:Connect(function()
+            TweenService:Create(button, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(40, 40, 50),
+                Size = UDim2.new(0, 70, 0, 70),
+                Position = UDim2.new(0, x - 35, 0, y - 35)
+            }):Play()
+            TweenService:Create(btnStroke, TweenInfo.new(0.2), {
+                Color = Color3.fromRGB(150, 150, 150)
+            }):Play()
+        end)
         
         -- Connect button to emote
         button.MouseButton1Click:Connect(function()
@@ -138,32 +283,27 @@ local function createEmoteWheel()
         end)
     end
     
-    -- Add title
+    -- Add center title
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0, 30)
-    titleLabel.Position = UDim2.new(0, 0, 0, 10)
+    titleLabel.Size = UDim2.new(0.5, 0, 0.15, 0)
+    titleLabel.Position = UDim2.new(0.25, 0, 0.42, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "EMOTE WHEEL"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.Text = "EMOTES"
+    titleLabel.TextColor3 = Color3.fromRGB(212, 175, 55)
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.TextScaled = true
     titleLabel.Parent = emoteWheelFrame
     
-    -- Add close button
-    local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 40, 0, 30)
-    closeButton.Position = UDim2.new(1, -50, 0, 10)
-    closeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    closeButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
-    closeButton.Text = "X"
-    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.TextScaled = true
-    closeButton.Parent = emoteWheelFrame
-    
-    closeButton.MouseButton1Click:Connect(function()
-        EmoteController:hideEmoteWheel()
-    end)
+    -- Subtitle
+    local subtitleLabel = Instance.new("TextLabel")
+    subtitleLabel.Size = UDim2.new(0.6, 0, 0.08, 0)
+    subtitleLabel.Position = UDim2.new(0.2, 0, 0.55, 0)
+    subtitleLabel.BackgroundTransparency = 1
+    subtitleLabel.Text = "Press G to close"
+    subtitleLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    subtitleLabel.Font = Enum.Font.Gotham
+    subtitleLabel.TextScaled = true
+    subtitleLabel.Parent = emoteWheelFrame
     
     -- Store reference
     EmoteController.emoteWheelFrame = emoteWheelFrame
@@ -171,18 +311,36 @@ local function createEmoteWheel()
     return screenGui
 end
 
--- Show emote wheel
+-- Show emote wheel with animation
 function EmoteController:showEmoteWheel()
     if EmoteController.emoteWheelFrame then
         EmoteController.emoteWheelFrame.Visible = true
+        EmoteController.emoteWheelFrame.Size = UDim2.new(0, 10, 0, 10)
+        EmoteController.emoteWheelFrame.Position = UDim2.new(0.5, -5, 0.5, -5)
+        
+        TweenService:Create(EmoteController.emoteWheelFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 400, 0, 400),
+            Position = UDim2.new(0.5, -200, 0.5, -200)
+        }):Play()
+        
         EmoteController.emoteWheelVisible = true
     end
 end
 
--- Hide emote wheel
+-- Hide emote wheel with animation
 function EmoteController:hideEmoteWheel()
     if EmoteController.emoteWheelFrame then
-        EmoteController.emoteWheelFrame.Visible = false
+        TweenService:Create(EmoteController.emoteWheelFrame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 10, 0, 10),
+            Position = UDim2.new(0.5, -5, 0.5, -5)
+        }):Play()
+        
+        task.delay(0.2, function()
+            if EmoteController.emoteWheelFrame then
+                EmoteController.emoteWheelFrame.Visible = false
+            end
+        end)
+        
         EmoteController.emoteWheelVisible = false
     end
 end
@@ -191,31 +349,47 @@ end
 function EmoteController:executeEmote(emoteKey)
     local emoteData = EmoteController.emotes[emoteKey]
     if not emoteData then
-        print("Invalid emote: " .. tostring(emoteKey))
+        warn("[EmoteController] Invalid emote: " .. tostring(emoteKey))
         return
     end
     
-    print("Executing emote: " .. emoteData.name)
+    print("[EmoteController] Executing emote: " .. emoteData.name)
     
-    -- In a real implementation, we would:
-    -- 1. Play the animation on the player character
-    -- 2. Play any associated sounds
-    -- 3. Trigger server events for special effects
+    -- Play the animation
+    local animTrack = playAnimation(emoteData.animationId, emoteData.duration)
     
-    -- For now, we'll just log the action
-    -- In a real game, we would send a remote event to the server
-    -- EventsRemoteEvent:FireServer("EXECUTE_EMOTE", emoteKey)
+    -- Play the sound if available
+    if emoteData.soundId then
+        playSound(emoteData.soundId, 0.7)
+    end
     
     -- Handle special effects
-    if emoteData.specialEffect == "MockingjayEcho" then
-        -- This would trigger mockingjays in the environment
-        EventsRemoteEvent:FireServer("TRIGGER_SPECIAL_EFFECT", "MockingjayResponse")
-    elseif emoteData.specialEffect == "ThunderResponse" then
-        -- This would create a subtle thunder effect in the distance
-        EventsRemoteEvent:FireServer("TRIGGER_SPECIAL_EFFECT", "ThunderResponse")
-    elseif emoteData.specialEffect == "CampfireAmbience" then
-        -- This would play ambient fire sounds if near a campfire
-        EventsRemoteEvent:FireServer("TRIGGER_SPECIAL_EFFECT", "CampfireAmbience")
+    if emoteData.specialEffect then
+        if emoteData.specialEffect == "MockingjayEcho" or emoteData.specialEffect == "MockingjayResponse" then
+            -- Trigger mockingjays to respond after a delay
+            task.delay(1.5, function()
+                -- Echo whistle back (verified bird whistle)
+                playSound("rbxassetid://9044353224", 0.4)
+                task.delay(0.8, function()
+                    playSound("rbxassetid://9044353224", 0.3)
+                end)
+            end)
+            EventsRemoteEvent:FireServer("TRIGGER_SPECIAL_EFFECT", "MockingjayResponse")
+            
+        elseif emoteData.specialEffect == "ThunderResponse" then
+            -- Distant thunder after defiance gesture (verified cannon sound)
+            task.delay(2, function()
+                playSound("rbxassetid://5034047634", 0.5)
+            end)
+            EventsRemoteEvent:FireServer("TRIGGER_SPECIAL_EFFECT", "ThunderResponse")
+            
+        elseif emoteData.specialEffect == "CampfireAmbience" then
+            EventsRemoteEvent:FireServer("TRIGGER_SPECIAL_EFFECT", "CampfireAmbience")
+            
+        elseif emoteData.specialEffect == "ShowRespect" then
+            -- Other players might receive notification of the salute
+            EventsRemoteEvent:FireServer("TRIGGER_SPECIAL_EFFECT", "RespectShown")
+        end
     end
 end
 

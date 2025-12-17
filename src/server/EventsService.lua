@@ -11,6 +11,12 @@ local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Config = require(ReplicatedFirst.Config)
 local PlayerStats = require(script.Parent.PlayerStats)
 
+-- Try to load BalanceConfig for tunable values
+local BalanceConfig = nil
+pcall(function()
+    BalanceConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("shared"):WaitForChild("BalanceConfig", 2))
+end)
+
 local EventsService = {}
 EventsService.activeMatch = false
 EventsService.matchStartTime = 0
@@ -18,46 +24,117 @@ EventsService.eventSchedule = {}
 EventsService.currentStormPhase = 0
 EventsService.stormActive = false
 EventsService.supplyDropActive = false
+EventsService.stormDamageConnection = nil
 
 -- RemoteEvents for client communication
 local eventsRemoteEvent = Instance.new("RemoteEvent")
 eventsRemoteEvent.Name = "EventsRemoteEvent"
 eventsRemoteEvent.Parent = ReplicatedStorage
 
+-- Get storm config value (from BalanceConfig if available, otherwise defaults)
+local function getStormValue(key, default, phase)
+    if BalanceConfig and BalanceConfig.Storm then
+        if phase and BalanceConfig.Storm[key] and BalanceConfig.Storm[key][phase] then
+            return BalanceConfig.Storm[key][phase]
+        elseif BalanceConfig.Storm[key] then
+            return BalanceConfig.Storm[key]
+        end
+    end
+    return default
+end
+
 -- Storm boundary management
 local function calculateStormPosition(currentPhase)
     -- Calculate storm boundary based on current phase
-    -- Phase 1: Arena at full size, Phase 7: Very small center area
-    local totalPhases = Config.STORM_PHASES
-    local phaseRatio = (totalPhases - currentPhase) / totalPhases
-    local currentRadius = Config.ARENA_SIZE * 0.5 * phaseRatio
+    -- Get phase size ratio from BalanceConfig
+    local phaseSize = getStormValue("PHASE_SIZE", nil, currentPhase)
+    if not phaseSize then
+        -- Fallback calculation
+        local totalPhases = Config.STORM_PHASES
+        phaseSize = (totalPhases - currentPhase) / totalPhases
+    end
+    
+    local currentRadius = Config.ARENA_SIZE * 0.5 * phaseSize
     return currentRadius, Vector3.new(0, 0, 0) -- Assuming arena center is at origin
+end
+
+-- Get storm damage for current phase
+local function getStormDamage(phase)
+    return getStormValue("PHASE_DAMAGE", phase, phase) -- Default damage = phase number
+end
+
+-- Start storm damage application
+local function startStormDamage(phase, radius, center)
+    -- Stop existing damage connection
+    if EventsService.stormDamageConnection then
+        EventsService.stormDamageConnection:Disconnect()
+    end
+    
+    local damagePerSecond = getStormDamage(phase)
+    
+    EventsService.stormDamageConnection = RunService.Heartbeat:Connect(function(dt)
+        if not EventsService.stormActive then
+            EventsService.stormDamageConnection:Disconnect()
+            return
+        end
+        
+        -- Apply damage to players outside the safe zone
+        for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+            if player.Character then
+                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local distance = (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - center).Magnitude
+                    if distance > radius then
+                        -- Player is in the storm
+                        local damage = damagePerSecond * dt
+                        PlayerStats:applyDamage(player, damage, "STORM")
+                    end
+                end
+            end
+        end
+    end)
 end
 
 -- Activate the next storm phase
 function EventsService:activateStormPhase(phase)
     if phase > Config.STORM_PHASES then
-        print("Final storm phase reached")
+        print("[EventsService] Final storm phase reached")
         return
     end
     
     EventsService.currentStormPhase = phase
+    EventsService.stormActive = true
     local radius, center = calculateStormPosition(phase)
     
-    print("Activating storm phase " .. phase .. ", radius: " .. radius)
+    print("[EventsService] Activating storm phase " .. phase .. ", radius: " .. radius .. ", damage: " .. getStormDamage(phase) .. "/s")
+    
+    -- Play storm warning sound via AudioService
+    local success, AudioService = pcall(function()
+        return require(script.Parent.AudioService)
+    end)
+    
+    if success and AudioService then
+        AudioService:playStormWarning(phase)
+    end
     
     -- Notify all clients about the storm phase
     eventsRemoteEvent:FireAllClients("STORM_PHASE_ACTIVE", phase, radius, center)
     
+    -- Start applying storm damage
+    startStormDamage(phase, radius, center)
+    
     -- Schedule next phase if not final phase
     if phase < Config.STORM_PHASES then
-        local nextPhaseTime = 0
-        if phase == 1 then nextPhaseTime = 300 -- 5 minutes for first phase
-        elseif phase == 2 then nextPhaseTime = 240 -- 4 minutes for second phase
-        elseif phase == 3 then nextPhaseTime = 180 -- 3 minutes for third phase
-        elseif phase == 4 then nextPhaseTime = 120 -- 2 minutes for fourth phase
-        elseif phase == 5 then nextPhaseTime = 90  -- 1.5 minutes for fifth phase
-        else nextPhaseTime = 60 -- 1 minute for final phases
+        local nextPhaseTime = getStormValue("PHASE_DURATIONS", nil, phase)
+        if not nextPhaseTime then
+            -- Fallback timing
+            if phase == 1 then nextPhaseTime = 300
+            elseif phase == 2 then nextPhaseTime = 240
+            elseif phase == 3 then nextPhaseTime = 180
+            elseif phase == 4 then nextPhaseTime = 120
+            elseif phase == 5 then nextPhaseTime = 90
+            else nextPhaseTime = 60
+            end
         end
         
         task.wait(nextPhaseTime)

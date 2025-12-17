@@ -35,16 +35,40 @@ lobbyRemoteEvent.Parent = ReplicatedStorage
 -- Player tracking
 local function addPlayerToLobby(player)
     if not LobbyService.lobbyPlayers[player] then
+        local districtNum = (countLobbyPlayers() % 12) + 1 -- Cycle through districts 1-12
+        
         LobbyService.lobbyPlayers[player] = {
             joinedTime = tick(),
-            districtNumber = countLobbyPlayers() + 1,
+            districtNumber = districtNum,
             ready = false
         }
         
         -- Assign district number visually
-        lobbyRemoteEvent:FireClient(player, "ASSIGN_DISTRICT", LobbyService.lobbyPlayers[player].districtNumber)
+        lobbyRemoteEvent:FireClient(player, "ASSIGN_DISTRICT", districtNum)
         
-        print("Player " .. player.Name .. " joined lobby as District " .. LobbyService.lobbyPlayers[player].districtNumber)
+        -- Apply district costume when character loads
+        local function applyDistrictCostume()
+            local success, DistrictCostumes = pcall(function()
+                return require(script.Parent.DistrictCostumes)
+            end)
+            
+            if success and DistrictCostumes then
+                DistrictCostumes:applyDistrictCostume(player, districtNum)
+            end
+        end
+        
+        -- Apply costume now if character exists
+        if player.Character then
+            applyDistrictCostume()
+        end
+        
+        -- Apply costume when character spawns/respawns
+        player.CharacterAdded:Connect(function(character)
+            task.wait(0.5) -- Wait for character to fully load
+            applyDistrictCostume()
+        end)
+        
+        print("[LobbyService] Player " .. player.Name .. " joined lobby as District " .. districtNum)
     end
 end
 
@@ -108,13 +132,23 @@ function LobbyService:beginMatch()
     LobbyService.gameState = "InProgress"
     LobbyService.matchStartTime = tick()
     
-    print("Match beginning with " .. countLobbyPlayers() .. " players")
+    print("[LobbyService] Match beginning with " .. countLobbyPlayers() .. " players")
     
     -- Notify all players match is starting
     lobbyRemoteEvent:FireAllClients("MATCH_STARTING", LobbyService.currentMatchId)
     
-    -- Additional setup would happen here via other services
-    EventsService:initializeMatch()
+    -- Start the 60-second tribute countdown (players locked on platforms)
+    local CharacterSpawner = require(script.Parent.CharacterSpawner)
+    CharacterSpawner:startCountdown(Config.COUNTDOWN_TIME)
+    
+    -- Wait for countdown to finish, then release players
+    task.spawn(function()
+        task.wait(Config.COUNTDOWN_TIME)
+        CharacterSpawner:endCountdown()
+        
+        -- Initialize match events (storm, supply drops, etc.)
+        EventsService:initializeMatch()
+    end)
 end
 
 -- Cancel the current match

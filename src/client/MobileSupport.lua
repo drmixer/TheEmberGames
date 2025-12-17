@@ -16,9 +16,8 @@ MobileSupport.mobileControls = nil
 function MobileSupport:init()
     print("MobileSupport initialized")
     
-    -- Detect if playing on mobile
-    local platform = UserInputService:GetPlatform()
-    MobileSupport.isMobile = platform == Enum.Platform.IOS or platform == Enum.Platform.Android
+    -- Detect if playing on mobile (use TouchEnabled as GetPlatform is restricted)
+    MobileSupport.isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
     
     if MobileSupport.isMobile then
         print("Mobile device detected - optimizing for touch input")

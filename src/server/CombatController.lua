@@ -72,15 +72,43 @@ function CombatController:processAttack(attacker, target, weaponType)
         PlayerStats:addStatusEffect(target, weaponStats.statusEffect, weaponStats.statusDuration or 10, 1)
     end
     
+    -- Get hit position for effects
+    local hitPosition = Vector3.new(0, 0, 0)
+    if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        hitPosition = target.Character.HumanoidRootPart.Position
+    end
+    
+    -- Play combat sounds via AudioService
+    local success, AudioService = pcall(function()
+        return require(script.Parent.AudioService)
+    end)
+    
+    if success and AudioService then
+        -- Determine sound type based on weapon
+        local soundType = "BLUNT_HIT"
+        if weaponType == "Sword" or weaponType == "Machete" or weaponType == "Knife" then
+            soundType = "SWORD_HIT"
+        elseif weaponType == "Spear" then
+            soundType = "SWORD_HIT"
+        elseif weaponType == "Bow" then
+            soundType = "ARROW_HIT"
+        end
+        
+        AudioService:playCombatSound(soundType, hitPosition, isCritical and 1.2 or 0.8)
+    end
+    
     -- Send damage notification to clients
     damageRemoteEvent:FireAllClients("PLAYER_DAMAGE", target.UserId, damage, isCritical)
+    
+    -- Send weapon hit event for visual effects
+    weaponRemoteEvent:FireAllClients("WEAPON_HIT", hitPosition, "player")
     
     -- Handle weapon durability if enabled
     if Config.WEAPON_DURABILITY_ENABLED then
         CombatController:reduceWeaponDurability(attacker, weaponType)
     end
     
-    print(attacker.Name .. " attacked " .. target.Name .. " with " .. weaponType .. " for " .. damage .. " damage")
+    print("[CombatController] " .. attacker.Name .. " attacked " .. target.Name .. " with " .. weaponType .. " for " .. damage .. " damage")
 end
 
 -- Get weapon statistics
