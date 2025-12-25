@@ -174,30 +174,34 @@ function MobileSupport:createMobileControls()
     
     -- Connect to stats updates to update mobile UI
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent")
+    local StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent", 10)
     
-    StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-        local args = {...}
-        
-        if eventType == "STAT_UPDATE" then
-            local statName, newValue = args[1], args[2]
+    if StatsRemoteEvent then
+        StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
             
-            if statName == "health" then
-                healthLabel.Text = "HEALTH: " .. math.floor(newValue)
-            elseif statName == "hunger" then
-                hungerLabel.Text = "HUNGER: " .. math.floor(newValue)
-            elseif statName == "thirst" then
-                thirstLabel.Text = "THIRST: " .. math.floor(newValue)
+            if eventType == "STAT_UPDATE" then
+                local statName, newValue = args[1], args[2]
+                
+                if statName == "health" then
+                    healthLabel.Text = "HEALTH: " .. math.floor(newValue)
+                elseif statName == "hunger" then
+                    hungerLabel.Text = "HUNGER: " .. math.floor(newValue)
+                elseif statName == "thirst" then
+                    thirstLabel.Text = "THIRST: " .. math.floor(newValue)
+                end
+            elseif eventType == "INITIAL_STATS" then
+                local stats = args[1]
+                if stats then
+                    healthLabel.Text = "HEALTH: " .. math.floor(stats.health or 100)
+                    hungerLabel.Text = "HUNGER: " .. math.floor(stats.hunger or 100)
+                    thirstLabel.Text = "THIRST: " .. math.floor(stats.thirst or 100)
+                end
             end
-        elseif eventType == "INITIAL_STATS" then
-            local stats = args[1]
-            if stats then
-                healthLabel.Text = "HEALTH: " .. math.floor(stats.health or 100)
-                hungerLabel.Text = "HUNGER: " .. math.floor(stats.hunger or 100)
-                thirstLabel.Text = "THIRST: " .. math.floor(stats.thirst or 100)
-            end
-        end
-    end)
+        end)
+    else
+        warn("[MobileSupport] StatsRemoteEvent not found - mobile stats display may not work")
+    end
     
     print("Mobile controls created")
 end

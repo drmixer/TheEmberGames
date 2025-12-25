@@ -105,20 +105,20 @@ function LobbyService:startMatchCountdown()
     -- Notify all players of countdown start
     lobbyRemoteEvent:FireAllClients("COUNTDOWN_START", LobbyService.countdownTime)
     
-    -- Start countdown loop
-    local countdownConnection
-    countdownConnection = RunService.Heartbeat:Connect(function()
-        if LobbyService.countdownTime <= 0 then
-            countdownConnection:Disconnect()
-            LobbyService:beginMatch()
-            return
+    -- Start countdown loop (proper 1-second intervals)
+    task.spawn(function()
+        while LobbyService.countdownTime > 0 and LobbyService.gameState == "Countdown" do
+            task.wait(1)
+            LobbyService.countdownTime = LobbyService.countdownTime - 1
+            
+            -- Broadcast remaining time
+            lobbyRemoteEvent:FireAllClients("COUNTDOWN_UPDATE", LobbyService.countdownTime)
+            print("[LobbyService] Countdown: " .. LobbyService.countdownTime)
         end
         
-        LobbyService.countdownTime -= 1
-        
-        -- Broadcast remaining time every 5 seconds and last 10 seconds
-        if LobbyService.countdownTime % 5 == 0 or LobbyService.countdownTime <= 10 then
-            lobbyRemoteEvent:FireAllClients("COUNTDOWN_UPDATE", LobbyService.countdownTime)
+        -- Countdown finished, begin match
+        if LobbyService.gameState == "Countdown" then
+            LobbyService:beginMatch()
         end
     end)
 end
@@ -132,12 +132,28 @@ function LobbyService:beginMatch()
     LobbyService.gameState = "InProgress"
     LobbyService.matchStartTime = tick()
     
-    print("[LobbyService] Match beginning with " .. countLobbyPlayers() .. " players")
+    local playerCount = countLobbyPlayers()
+    print("[LobbyService] Match beginning with " .. playerCount .. " players")
+    
+    -- Fill remaining slots with bots (if enabled)
+    if Config.BOTS_ENABLED then
+        local success, BotController = pcall(function()
+            return require(script.Parent.BotController)
+        end)
+        
+        if success and BotController then
+            local targetTributes = Config.PLAYER_CAP -- Fill to max capacity (24)
+            if playerCount < targetTributes then
+                print("[LobbyService] Filling " .. (targetTributes - playerCount) .. " empty slots with bots...")
+                BotController:fillWithBots(targetTributes)
+            end
+        end
+    end
     
     -- Notify all players match is starting
     lobbyRemoteEvent:FireAllClients("MATCH_STARTING", LobbyService.currentMatchId)
     
-    -- Start the 60-second tribute countdown (players locked on platforms)
+    -- Start the tribute countdown (players locked on platforms)
     local CharacterSpawner = require(script.Parent.CharacterSpawner)
     CharacterSpawner:startCountdown(Config.COUNTDOWN_TIME)
     
@@ -194,7 +210,35 @@ function LobbyService.init()
     
     -- Handle remote events from clients
     lobbyRemoteEvent.OnServerEvent:Connect(function(player, action, ...)
-        if action == "PLAYER_READY" then
+        if action == "QUEUE_FOR_MATCH" then
+            -- Player wants to start/join a match
+            print("[LobbyService] " .. player.Name .. " queued for match")
+            
+            -- If not already in countdown, start it
+            if LobbyService.gameState == "WaitingForPlayers" then
+                -- Mark player as ready
+                if LobbyService.lobbyPlayers[player] then
+                    LobbyService.lobbyPlayers[player].ready = true
+                end
+                
+                -- Check if we can start
+                if countLobbyPlayers() >= Config.PLAYER_MIN then
+                    LobbyService:startMatchCountdown()
+                else
+                    lobbyRemoteEvent:FireClient(player, "LOBBY_STATUS", {
+                        gameState = "WaitingForPlayers",
+                        message = "Waiting for " .. (Config.PLAYER_MIN - countLobbyPlayers()) .. " more players..."
+                    })
+                end
+            elseif LobbyService.gameState == "Countdown" then
+                lobbyRemoteEvent:FireClient(player, "LOBBY_STATUS", {
+                    gameState = "Countdown",
+                    countdownTime = LobbyService.countdownTime,
+                    message = "Match starting in " .. LobbyService.countdownTime .. " seconds!"
+                })
+            end
+            
+        elseif action == "PLAYER_READY" then
             if LobbyService.lobbyPlayers[player] then
                 LobbyService.lobbyPlayers[player].ready = true
                 print("Player " .. player.Name .. " is ready")

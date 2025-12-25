@@ -12,8 +12,8 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
-local StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent")
-local ArenaRemoteEvent = ReplicatedStorage:WaitForChild("ArenaRemoteEvent")
+local StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent", 10)
+local ArenaRemoteEvent = ReplicatedStorage:WaitForChild("ArenaRemoteEvent", 10)
 
 local SpectatorMode = {}
 SpectatorMode.isActive = false
@@ -317,38 +317,44 @@ function SpectatorMode:init()
         onPlayerAdded(player)
     end
     
-    -- Connect to other game events
-    StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-        local args = {...}
-        
-        if eventType == "PLAYER_ELIMINATED" then
-            local eliminatedUserId, eliminatedName = args[1], args[2]
+    -- Connect to other game events (if RemoteEvents exist)
+    if StatsRemoteEvent then
+        StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
             
-            if eliminatedUserId == Player.UserId then
-                -- This player was eliminated
-                task.wait(1) -- Wait a moment for the elimination to process
-                SpectatorMode:enable()
-            else
-                -- Another player was eliminated
-                if SpectatorMode.playerList[eliminatedUserId] then
-                    SpectatorMode.playerList[eliminatedUserId].eliminated = true
-                    SpectatorMode:updatePlayerList()
-                    
-                    if SpectatorMode.currentTarget and SpectatorMode.currentTarget.UserId == eliminatedUserId then
-                        SpectatorMode.currentTarget = nil
-                        -- Automatically follow another player
-                        SpectatorMode:cyclePlayer("next")
-                    end
-                end
+            if eventType == "PLAYER_ELIMINATED" then
+                local eliminatedUserId, eliminatedName = args[1], args[2]
                 
-                print(eliminatedName .. " has been eliminated. Remaining: TBD")
+                if eliminatedUserId == Player.UserId then
+                    -- This player was eliminated
+                    task.wait(1) -- Wait a moment for the elimination to process
+                    SpectatorMode:enable()
+                else
+                    -- Another player was eliminated
+                    if SpectatorMode.playerList[eliminatedUserId] then
+                        SpectatorMode.playerList[eliminatedUserId].eliminated = true
+                        SpectatorMode:updatePlayerList()
+                        
+                        if SpectatorMode.currentTarget and SpectatorMode.currentTarget.UserId == eliminatedUserId then
+                            SpectatorMode.currentTarget = nil
+                            -- Automatically follow another player
+                            SpectatorMode:cyclePlayer("next")
+                        end
+                    end
+                    
+                    print(eliminatedName .. " has been eliminated. Remaining: TBD")
+                end
             end
-        end
-    end)
+        end)
+    else
+        warn("[SpectatorMode] StatsRemoteEvent not found - elimination detection may not work")
+    end
     
-    ArenaRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-        -- Handle arena events if needed
-    end)
+    if ArenaRemoteEvent then
+        ArenaRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            -- Handle arena events if needed
+        end)
+    end
     
     print("SpectatorMode initialized and connected to events")
 end

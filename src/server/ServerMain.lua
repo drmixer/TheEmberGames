@@ -65,6 +65,10 @@ function ServerMain.init()
     -- Initialize MatchService (victory detection, game state)
     MatchService.init()
     
+    -- Initialize BotController (AI tributes for solo play)
+    local BotController = require(script.Parent.BotController)
+    BotController.init()
+    
     -- Initialize LobbyService last (starts the game flow)
     LobbyService.init()
     

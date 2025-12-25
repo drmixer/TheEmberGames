@@ -373,6 +373,9 @@ function MatchHUD.init()
     
     createHUD()
     
+    -- Hide by default (show when match starts)
+    MatchHUD:hide()
+    
     -- Connect to remote events
     local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
     if matchRemote then
@@ -388,6 +391,18 @@ function MatchHUD.init()
                 MatchHUD:show()
             elseif eventType == "MATCH_END" then
                 -- Keep visible for final stats
+            end
+        end)
+    end
+    
+    -- Also connect to LobbyRemoteEvent for MATCH_STARTING
+    local lobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 10)
+    if lobbyRemote then
+        lobbyRemote.OnClientEvent:Connect(function(eventType)
+            if eventType == "MATCH_STARTING" then
+                MatchHUD:reset()
+                MatchHUD:show()
+                MatchHUD:startMatchTimer()
             end
         end)
     end

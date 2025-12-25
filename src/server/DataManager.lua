@@ -10,10 +10,22 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataManager = {}
 DataManager.playerData = {}
 DataManager.autoSaveInterval = 300 -- 5 minutes
+DataManager.datastoreEnabled = false
 
--- DataStore references
-local PlayerDataStore = DataStoreService:GetDataStore("EmberGames_PlayerData_v1")
-local StatsDataStore = DataStoreService:GetDataStore("EmberGames_Stats_v1")
+-- DataStore references (wrapped in pcall for Studio testing)
+local PlayerDataStore, StatsDataStore
+local success, err = pcall(function()
+    PlayerDataStore = DataStoreService:GetDataStore("EmberGames_PlayerData_v1")
+    StatsDataStore = DataStoreService:GetDataStore("EmberGames_Stats_v1")
+end)
+
+if success then
+    DataManager.datastoreEnabled = true
+    print("[DataManager] DataStore access enabled")
+else
+    warn("[DataManager] DataStore not available (Studio mode) - data will not persist")
+    DataManager.datastoreEnabled = false
+end
 
 -- Default data schema
 local DEFAULT_DATA = {
@@ -135,6 +147,15 @@ function DataManager:loadPlayerData(player)
     local userId = player.UserId
     local key = "Player_" .. userId
     
+    -- If DataStore is not available, use defaults
+    if not DataManager.datastoreEnabled or not PlayerDataStore then
+        DataManager.playerData[userId] = deepCopy(DEFAULT_DATA)
+        DataManager.playerData[userId].firstJoin = os.time()
+        DataManager.playerData[userId].lastJoin = os.time()
+        print("[DataManager] Using default data for " .. player.Name .. " (Studio mode)")
+        return DataManager.playerData[userId]
+    end
+    
     local success, data = pcall(function()
         return PlayerDataStore:GetAsync(key)
     end)
@@ -167,6 +188,12 @@ function DataManager:savePlayerData(player)
     if not data then
         warn("[DataManager] No data to save for " .. player.Name)
         return false
+    end
+    
+    -- If DataStore is not available, skip saving
+    if not DataManager.datastoreEnabled or not PlayerDataStore then
+        print("[DataManager] Skipping save for " .. player.Name .. " (Studio mode)")
+        return true
     end
     
     local key = "Player_" .. userId

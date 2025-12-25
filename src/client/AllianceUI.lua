@@ -170,7 +170,10 @@ local function createUI()
     membersLayout.Parent = membersFrame
     
     local membersPadding = Instance.new("UIPadding")
-    membersPadding.PaddingAll = UDim.new(0, 8)
+    membersPadding.PaddingTop = UDim.new(0, 8)
+    membersPadding.PaddingBottom = UDim.new(0, 8)
+    membersPadding.PaddingLeft = UDim.new(0, 8)
+    membersPadding.PaddingRight = UDim.new(0, 8)
     membersPadding.Parent = membersFrame
     
     -- Action buttons container

@@ -79,7 +79,7 @@ local function createLoadingScreen()
     local vignetteBottom = vignetteTop:Clone()
     vignetteBottom.Name = "VignetteBottom"
     vignetteBottom.Position = UDim2.new(0, 0, 0.8, 0)
-    vignetteBottom.FindFirstChild("UIGradient").Rotation = -90
+    vignetteBottom:FindFirstChild("UIGradient").Rotation = -90
     vignetteBottom.Parent = background
     
     -- Logo container

@@ -6,13 +6,25 @@ local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LeaderboardService = {}
+LeaderboardService.datastoreEnabled = false
 
--- DataStore references
-local leaderboards = {
-    wins = DataStoreService:GetOrderedDataStore("Leaderboard_Wins"),
-    kills = DataStoreService:GetOrderedDataStore("Leaderboard_Kills"),
-    tier = DataStoreService:GetOrderedDataStore("Leaderboard_Tier"),
-}
+-- DataStore references (wrapped in pcall for Studio testing)
+local leaderboards = {}
+local success, err = pcall(function()
+    leaderboards = {
+        wins = DataStoreService:GetOrderedDataStore("Leaderboard_Wins"),
+        kills = DataStoreService:GetOrderedDataStore("Leaderboard_Kills"),
+        tier = DataStoreService:GetOrderedDataStore("Leaderboard_Tier"),
+    }
+end)
+
+if success then
+    LeaderboardService.datastoreEnabled = true
+    print("[LeaderboardService] DataStore access enabled")
+else
+    warn("[LeaderboardService] DataStore not available (Studio mode)")
+    LeaderboardService.datastoreEnabled = false
+end
 
 -- Cache for leaderboard data
 local cache = {}
@@ -20,6 +32,8 @@ local CACHE_DURATION = 60 -- Refresh every 60 seconds
 
 -- Update player's score on a leaderboard
 function LeaderboardService:updateScore(userId, category, value)
+    if not LeaderboardService.datastoreEnabled then return end
+    
     local datastore = leaderboards[category]
     if not datastore then return end
     
@@ -34,6 +48,7 @@ end
 
 -- Get top entries for a category
 function LeaderboardService:getTopEntries(category, count)
+    if not LeaderboardService.datastoreEnabled then return {} end
     count = count or 10
     
     -- Check cache
@@ -89,6 +104,8 @@ end
 
 -- Get player's rank in a category
 function LeaderboardService:getPlayerRank(userId, category)
+    if not LeaderboardService.datastoreEnabled then return nil end
+    
     local datastore = leaderboards[category]
     if not datastore then return nil end
     

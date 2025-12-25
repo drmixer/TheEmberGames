@@ -168,20 +168,36 @@ function MatchService:checkVictoryCondition()
         return
     end
     
-    local activeCount = MatchService:getActivePlayerCount()
+    local activePlayerCount = MatchService:getActivePlayerCount()
     
-    if activeCount <= 1 then
-        -- We have a winner (or no players left)
+    -- Also check for alive bots
+    local aliveBotCount = 0
+    local success, BotController = pcall(function()
+        return require(script.Parent.BotController)
+    end)
+    if success and BotController then
+        aliveBotCount = BotController:getAliveCount()
+    end
+    
+    local totalAlive = activePlayerCount + aliveBotCount
+    
+    if activePlayerCount <= 0 and aliveBotCount > 0 then
+        -- All human players eliminated, bots win (game over for human)
+        MatchService:endMatch(nil)
+    elseif totalAlive <= 1 and activePlayerCount == 1 then
+        -- Only 1 human player left and no bots - they win!
         local activePlayers = MatchService:getActivePlayers()
-        local winner = activePlayers[1] -- May be nil if no one left
-        
+        local winner = activePlayers[1]
         MatchService:endMatch(winner)
-    elseif activeCount == 2 then
-        -- Final 2 notification
+    elseif totalAlive <= 1 and activePlayerCount == 0 then
+        -- No one left
+        MatchService:endMatch(nil)
+    elseif totalAlive == 2 and activePlayerCount >= 1 then
+        -- Final 2 notification (could be 2 players, or 1 player + 1 bot)
         local activePlayers = MatchService:getActivePlayers()
         matchRemoteEvent:FireAllClients("FINAL_TWO", {
             player1 = activePlayers[1] and activePlayers[1].Name,
-            player2 = activePlayers[2] and activePlayers[2].Name
+            player2 = activePlayers[2] and activePlayers[2].Name or "AI Tribute"
         })
     end
 end
@@ -294,6 +310,14 @@ function MatchService:returnToLobby()
     MatchService.activePlayers = {}
     MatchService.eliminatedPlayers = {}
     MatchService.winner = nil
+    
+    -- Clean up all bots
+    local success, BotController = pcall(function()
+        return require(script.Parent.BotController)
+    end)
+    if success and BotController then
+        BotController:removeAllBots()
+    end
     
     -- Notify all clients to return to lobby
     matchRemoteEvent:FireAllClients("RETURN_TO_LOBBY")

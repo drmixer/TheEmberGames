@@ -690,13 +690,6 @@ function WeaponSystem:applyDamage(attacker, target, weapon, hitPosition)
         return require(game:GetService("ReplicatedFirst"):WaitForChild("Config", 1))
     end)
     
-    if not success then
-        -- Try shared config
-        success, Config = pcall(function()
-            return require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Config", 1))
-        end)
-    end
-    
     -- Calculate critical hit
     local critChance = success and Config.CRITICAL_HIT_CHANCE or 0.1
     local critMultiplier = success and Config.CRITICAL_HIT_MULTIPLIER or 2
@@ -895,8 +888,9 @@ function WeaponSystem.init()
             end
         end
     end)
-    
-    print("[WeaponSystem] Initialized with " .. #(function() local c = 0 for _ in pairs(WEAPONS) do c = c + 1 end return c end)() .. " weapon types")
+    local weaponCount = 0
+    for _ in pairs(WEAPONS) do weaponCount = weaponCount + 1 end
+    print("[WeaponSystem] Initialized with " .. weaponCount .. " weapon types")
     print("[WeaponSystem] Ready!")
 end
 

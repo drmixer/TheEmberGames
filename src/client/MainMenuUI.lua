@@ -323,7 +323,7 @@ function MainMenuUI.init()
     -- Show menu initially
     MainMenuUI:show()
     
-    -- Hide when match starts
+    -- Hide when match starts (via MatchRemoteEvent)
     local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
     if matchRemote then
         matchRemote.OnClientEvent:Connect(function(eventType)
@@ -337,6 +337,17 @@ function MainMenuUI.init()
                         MainMenuUI:show()
                     end
                 end)
+            end
+        end)
+    end
+    
+    -- Also hide when match starts (via LobbyRemoteEvent)
+    local lobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 10)
+    if lobbyRemote then
+        lobbyRemote.OnClientEvent:Connect(function(eventType)
+            if eventType == "MATCH_STARTING" then
+                MainMenuUI:hide()
+                MainMenuUI.isInMatch = true
             end
         end)
     end

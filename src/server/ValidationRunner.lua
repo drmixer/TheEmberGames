@@ -63,7 +63,7 @@ local TESTS = {
         category = "balance",
         run = function()
             local success, BalanceConfig = pcall(function()
-                return require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("BalanceConfig", 2))
+                return require(ReplicatedFirst:WaitForChild("BalanceConfig", 2))
             end)
             
             if not success then
@@ -100,7 +100,7 @@ local TESTS = {
         category = "balance",
         run = function()
             local success, BalanceConfig = pcall(function()
-                return require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("BalanceConfig", 2))
+                return require(ReplicatedFirst:WaitForChild("BalanceConfig", 2))
             end)
             
             if not success then
@@ -134,7 +134,7 @@ local TESTS = {
         category = "balance",
         run = function()
             local success, BalanceConfig = pcall(function()
-                return require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("BalanceConfig", 2))
+                return require(ReplicatedFirst:WaitForChild("BalanceConfig", 2))
             end)
             
             if not success then

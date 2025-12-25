@@ -2,12 +2,12 @@
 -- Comprehensive testing utilities for The Ember Games
 -- Provides tools for multiplayer validation, balance testing, and performance monitoring
 
-local Players = game:GetService(\"Players\")
-local ReplicatedStorage = game:GetService(\"ReplicatedStorage\")
-local RunService = game:GetService(\"RunService\")
-local Stats = game:GetService(\"Stats\")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
 
-local ReplicatedFirst = game:GetService(\"ReplicatedFirst\")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
 local TestingService = {}
 TestingService.debugMode = false
@@ -16,8 +16,8 @@ TestingService.testResults = {}
 TestingService.bots = {}
 
 -- Create remote event for testing commands
-local testingRemote = Instance.new(\"RemoteEvent\")
-testingRemote.Name = \"TestingRemote\"
+local testingRemote = Instance.new("RemoteEvent")
+testingRemote.Name = "TestingRemote"
 testingRemote.Parent = ReplicatedStorage
 
 -- Admin player IDs (for production, set real admin IDs)
@@ -47,13 +47,13 @@ end
 function TestingService:enableDebugMode()
     TestingService.debugMode = true
     print("[TestingService] Debug mode ENABLED - all players have admin access")
-    testingRemote:FireAllClients(\"DEBUG_MODE\", true)
+    testingRemote:FireAllClients("DEBUG_MODE", true)
 end
 
 function TestingService:disableDebugMode()
     TestingService.debugMode = false
     print("[TestingService] Debug mode DISABLED")
-    testingRemote:FireAllClients(\"DEBUG_MODE\", false)
+    testingRemote:FireAllClients("DEBUG_MODE", false)
 end
 
 -- ============ PLAYER MANIPULATION ============
@@ -64,8 +64,8 @@ function TestingService:setPlayerHealth(player, health)
     end)
     
     if success and PlayerStats then
-        PlayerStats:updateStat(player, \"health\", health, false)
-        print(\"[TestingService] Set \" .. player.Name .. \" health to \" .. health)
+        PlayerStats:updateStat(player, "health", health, false)
+        print("[TestingService] Set " .. player.Name .. " health to " .. health)
     end
 end
 
@@ -75,8 +75,8 @@ function TestingService:setPlayerHunger(player, hunger)
     end)
     
     if success and PlayerStats then
-        PlayerStats:updateStat(player, \"hunger\", hunger, false)
-        print(\"[TestingService] Set \" .. player.Name .. \" hunger to \" .. hunger)
+        PlayerStats:updateStat(player, "hunger", hunger, false)
+        print("[TestingService] Set " .. player.Name .. " hunger to " .. hunger)
     end
 end
 
@@ -86,8 +86,8 @@ function TestingService:setPlayerThirst(player, thirst)
     end)
     
     if success and PlayerStats then
-        PlayerStats:updateStat(player, \"thirst\", thirst, false)
-        print(\"[TestingService] Set \" .. player.Name .. \" thirst to \" .. thirst)
+        PlayerStats:updateStat(player, "thirst", thirst, false)
+        print("[TestingService] Set " .. player.Name .. " thirst to " .. thirst)
     end
 end
 
@@ -95,7 +95,7 @@ function TestingService:healPlayer(player)
     TestingService:setPlayerHealth(player, 100)
     TestingService:setPlayerHunger(player, 100)
     TestingService:setPlayerThirst(player, 100)
-    print(\"[TestingService] Fully healed \" .. player.Name)
+    print("[TestingService] Fully healed " .. player.Name)
 end
 
 function TestingService:giveAllWeapons(player)
@@ -104,27 +104,27 @@ function TestingService:giveAllWeapons(player)
     end)
     
     if success and WeaponSystem then
-        local weapons = {\"WoodenStick\", \"SharpStick\", \"StoneKnife\", \"HandmadeAxe\", \"Machete\", \"Slingshot\", \"Bow\", \"ThrowingKnife\"}
+        local weapons = {"WoodenStick", "SharpStick", "StoneKnife", "HandmadeAxe", "Machete", "Slingshot", "Bow", "ThrowingKnife"}
         for _, weaponId in ipairs(weapons) do
             WeaponSystem:giveWeapon(player, weaponId)
         end
-        print(\"[TestingService] Gave all weapons to \" .. player.Name)
+        print("[TestingService] Gave all weapons to " .. player.Name)
     end
 end
 
 function TestingService:teleportPlayer(player, position)
     if player.Character then
-        local hrp = player.Character:FindFirstChild(\"HumanoidRootPart\")
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
             hrp.CFrame = CFrame.new(position)
-            print(\"[TestingService] Teleported \" .. player.Name .. \" to \" .. tostring(position))
+            print("[TestingService] Teleported " .. player.Name .. " to " .. tostring(position))
         end
     end
 end
 
 function TestingService:teleportToPlayer(player, targetPlayer)
     if player.Character and targetPlayer.Character then
-        local targetHrp = targetPlayer.Character:FindFirstChild(\"HumanoidRootPart\")
+        local targetHrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
         if targetHrp then
             TestingService:teleportPlayer(player, targetHrp.Position + Vector3.new(5, 0, 0))
         end
@@ -140,7 +140,7 @@ function TestingService:forceStartMatch()
     
     if success and LobbyService then
         LobbyService:startMatch()
-        print(\"[TestingService] Force started match\")
+        print("[TestingService] Force started match")
     end
 end
 
@@ -151,7 +151,7 @@ function TestingService:forceEndMatch(winner)
     
     if success and MatchService then
         MatchService:endMatch(winner)
-        print(\"[TestingService] Force ended match\")
+        print("[TestingService] Force ended match")
     end
 end
 
@@ -162,7 +162,7 @@ function TestingService:skipToStormPhase(phase)
     
     if success and EventsService then
         EventsService:activateStormPhase(phase)
-        print(\"[TestingService] Skipped to storm phase \" .. phase)
+        print("[TestingService] Skipped to storm phase " .. phase)
     end
 end
 
@@ -174,7 +174,7 @@ function TestingService:spawnSupplyDrop()
     if success and EventsService then
         EventsService.supplyDropActive = false -- Force allow
         EventsService:deploySupplyDrop()
-        print(\"[TestingService] Spawned supply drop\")
+        print("[TestingService] Spawned supply drop")
     end
 end
 
@@ -185,7 +185,7 @@ function TestingService:triggerHazard(hazardType)
     
     if success and EventsService then
         EventsService:activateHazardEvent(hazardType)
-        print(\"[TestingService] Triggered hazard: \" .. hazardType)
+        print("[TestingService] Triggered hazard: " .. hazardType)
     end
 end
 
@@ -194,7 +194,7 @@ end
 function TestingService:spawnTestBot(name, district)
     -- Create a fake player-like object for testing
     local bot = {
-        Name = name or (\"TestBot_\" .. #TestingService.bots + 1),
+        Name = name or ("TestBot_" .. #TestingService.bots + 1),
         UserId = -100 - #TestingService.bots,
         District = district or math.random(1, 12),
         isBot = true,
@@ -202,14 +202,14 @@ function TestingService:spawnTestBot(name, district)
     }
     
     -- Create bot character
-    local character = Instance.new(\"Model\")
+    local character = Instance.new("Model")
     character.Name = bot.Name
     
-    local humanoid = Instance.new(\"Humanoid\")
+    local humanoid = Instance.new("Humanoid")
     humanoid.Parent = character
     
-    local hrp = Instance.new(\"Part\")
-    hrp.Name = \"HumanoidRootPart\"
+    local hrp = Instance.new("Part")
+    hrp.Name = "HumanoidRootPart"
     hrp.Size = Vector3.new(2, 2, 1)
     hrp.Transparency = 0.5
     hrp.Color = Color3.fromRGB(255, 100, 100)
@@ -218,8 +218,8 @@ function TestingService:spawnTestBot(name, district)
     hrp.Position = Vector3.new(math.random(-200, 200), 10, math.random(-200, 200))
     hrp.Parent = character
     
-    local head = Instance.new(\"Part\")
-    head.Name = \"Head\"
+    local head = Instance.new("Part")
+    head.Name = "Head"
     head.Size = Vector3.new(2, 1, 1)
     head.Position = hrp.Position + Vector3.new(0, 1.5, 0)
     head.Anchored = true
@@ -233,7 +233,7 @@ function TestingService:spawnTestBot(name, district)
     
     table.insert(TestingService.bots, bot)
     
-    print(\"[TestingService] Spawned test bot: \" .. bot.Name .. \" (District \" .. bot.District .. \")\")
+    print("[TestingService] Spawned test bot: " .. bot.Name .. " (District " .. bot.District .. ")")
     
     return bot
 end
@@ -245,7 +245,7 @@ function TestingService:removeAllBots()
         end
     end
     TestingService.bots = {}
-    print(\"[TestingService] Removed all test bots\")
+    print("[TestingService] Removed all test bots")
 end
 
 function TestingService:spawnFullGame()
@@ -257,7 +257,7 @@ function TestingService:spawnFullGame()
         TestingService:spawnTestBot(nil, ((i - 1) % 12) + 1)
     end
     
-    print(\"[TestingService] Spawned \" .. botsNeeded .. \" bots for full game simulation\")
+    print("[TestingService] Spawned " .. botsNeeded .. " bots for full game simulation")
 end
 
 -- ============ PERFORMANCE MONITORING ============
@@ -286,20 +286,20 @@ function TestingService:startPerformanceMonitoring()
         end
     end)
     
-    print(\"[TestingService] Started performance monitoring\")
+    print("[TestingService] Started performance monitoring")
 end
 
 function TestingService:stopPerformanceMonitoring()
     if TestingService.performanceConnection then
         TestingService.performanceConnection:Disconnect()
         TestingService.performanceConnection = nil
-        print(\"[TestingService] Stopped performance monitoring\")
+        print("[TestingService] Stopped performance monitoring")
     end
 end
 
 function TestingService:getPerformanceReport()
     if #TestingService.performanceLog == 0 then
-        return {error = \"No performance data collected\"}
+        return {error = "No performance data collected"}
     end
     
     local totalFps = 0
@@ -326,16 +326,16 @@ function TestingService:getPerformanceReport()
         maxFps = math.floor(maxFps * 10) / 10,
         avgHeartbeat = math.floor(avgHeartbeat * 100) / 100,
         maxMemory = math.floor(maxMemory * 10) / 10,
-        status = avgFps >= 55 and \"EXCELLENT\" or (avgFps >= 45 and \"GOOD\" or (avgFps >= 30 and \"ACCEPTABLE\" or \"POOR\")),
+        status = avgFps >= 55 and "EXCELLENT" or (avgFps >= 45 and "GOOD" or (avgFps >= 30 and "ACCEPTABLE" or "POOR")),
     }
     
-    print(\"[TestingService] Performance Report:\")
-    print(\"  Samples: \" .. report.samples)
-    print(\"  Avg FPS: \" .. report.avgFps .. \" (\" .. report.status .. \")\")
-    print(\"  Min FPS: \" .. report.minFps)
-    print(\"  Max FPS: \" .. report.maxFps)
-    print(\"  Avg Heartbeat: \" .. report.avgHeartbeat .. \"ms\")
-    print(\"  Max Memory: \" .. report.maxMemory .. \"MB\")
+    print("[TestingService] Performance Report:")
+    print("  Samples: " .. report.samples)
+    print("  Avg FPS: " .. report.avgFps .. " (" .. report.status .. ")")
+    print("  Min FPS: " .. report.minFps)
+    print("  Max FPS: " .. report.maxFps)
+    print("  Avg Heartbeat: " .. report.avgHeartbeat .. "ms")
+    print("  Max Memory: " .. report.maxMemory .. "MB")
     
     return report
 end
@@ -343,67 +343,73 @@ end
 -- ============ AUTOMATED TESTS ============
 
 function TestingService:runBalanceTest()
-    print(\"[TestingService] Running balance test...\")
+    print("[TestingService] Running balance test...")
     
     local results = {
-        timestamp = os.date(\"%Y-%m-%d %H:%M:%S\"),
+        timestamp = os.date("%Y-%m-%d %H:%M:%S"),
         tests = {}
     }
     
     -- Test 1: Weapon damage vs player health
     local success, BalanceConfig = pcall(function()
-        return require(game:GetService(\"ReplicatedStorage\"):WaitForChild(\"shared\"):WaitForChild(\"BalanceConfig\"))
+        return require(ReplicatedFirst:WaitForChild("BalanceConfig", 2))
     end)
     
-    if success then
+    if success and BalanceConfig then
         -- Calculate time-to-kill for each weapon
         local playerHealth = 100
-        for weaponName, weaponData in pairs(BalanceConfig.Weapons) do
-            if weaponData.damage then
-                local hitsToKill = math.ceil(playerHealth / weaponData.damage)
-                local timeToKill = hitsToKill * (weaponData.attackSpeed or 1)
-                
-                table.insert(results.tests, {
-                    name = weaponName .. \" TTK\",
-                    value = timeToKill,
-                    unit = \"seconds\",
-                    status = timeToKill >= 2 and timeToKill <= 10 and \"PASS\" or \"REVIEW\",
-                })
+        if BalanceConfig.Weapons then
+            for weaponName, weaponData in pairs(BalanceConfig.Weapons) do
+                if weaponData.damage then
+                    local hitsToKill = math.ceil(playerHealth / weaponData.damage)
+                    local timeToKill = hitsToKill * (weaponData.attackSpeed or 1)
+                    
+                    table.insert(results.tests, {
+                        name = weaponName .. " TTK",
+                        value = timeToKill,
+                        unit = "seconds",
+                        status = timeToKill >= 2 and timeToKill <= 10 and "PASS" or "REVIEW",
+                    })
+                end
             end
         end
         
         -- Test survival rates
-        local hungerDrain = BalanceConfig.Survival.HUNGER_DRAIN_ACTIVE
-        local thirstDrain = BalanceConfig.Survival.THIRST_DRAIN_ACTIVE
-        
-        table.insert(results.tests, {
-            name = \"Hunger Depletion Time\",
-            value = 100 / hungerDrain,
-            unit = \"seconds\",
-            status = (100 / hungerDrain) >= 180 and \"PASS\" or \"TOO_FAST\",
-        })
-        
-        table.insert(results.tests, {
-            name = \"Thirst Depletion Time\",
-            value = 100 / thirstDrain,
-            unit = \"seconds\",
-            status = (100 / thirstDrain) >= 120 and \"PASS\" or \"TOO_FAST\",
-        })
+        if BalanceConfig.Survival then
+            local hungerDrain = BalanceConfig.Survival.HUNGER_DRAIN_ACTIVE or 1
+            local thirstDrain = BalanceConfig.Survival.THIRST_DRAIN_ACTIVE or 1
+            
+            table.insert(results.tests, {
+                name = "Hunger Depletion Time",
+                value = 100 / hungerDrain,
+                unit = "seconds",
+                status = (100 / hungerDrain) >= 180 and "PASS" or "TOO_FAST",
+            })
+            
+            table.insert(results.tests, {
+                name = "Thirst Depletion Time",
+                value = 100 / thirstDrain,
+                unit = "seconds",
+                status = (100 / thirstDrain) >= 120 and "PASS" or "TOO_FAST",
+            })
+        end
+    else
+        print("[TestingService] BalanceConfig not found - skipping balance tests")
     end
     
     -- Print results
-    print(\"\\n=== BALANCE TEST RESULTS ===\")
+    print("\n=== BALANCE TEST RESULTS ===")
     for _, test in ipairs(results.tests) do
-        print(string.format(\"  [%s] %s: %.2f %s\", test.status, test.name, test.value, test.unit))
+        print(string.format("  [%s] %s: %.2f %s", test.status, test.name, test.value, test.unit))
     end
-    print(\"===========================\\n\")
+    print("===========================\n")
     
-    TestingService.testResults[\"balance\"] = results
+    TestingService.testResults["balance"] = results
     return results
 end
 
 function TestingService:runMultiplayerTest(playerCount)
-    print(\"[TestingService] Running multiplayer test with \" .. playerCount .. \" players...\")
+    print("[TestingService] Running multiplayer test with " .. playerCount .. " players...")
     
     -- Spawn bots to reach target player count
     TestingService:removeAllBots()
@@ -434,16 +440,16 @@ function TestingService:runMultiplayerTest(playerCount)
         status = perfReport.status,
     }
     
-    TestingService.testResults[\"multiplayer_\" .. playerCount] = results
+    TestingService.testResults["multiplayer_" .. playerCount] = results
     
-    print(\"[TestingService] Multiplayer test complete: \" .. results.status)
+    print("[TestingService] Multiplayer test complete: " .. results.status)
     return results
 end
 
 -- ============ INITIALIZATION ============
 
 function TestingService.init()
-    print(\"[TestingService] Initializing...\")
+    print("[TestingService] Initializing...")
     
     -- Enable debug mode by default during development
     TestingService:enableDebugMode()
@@ -451,42 +457,42 @@ function TestingService.init()
     -- Handle remote events from admin clients
     testingRemote.OnServerEvent:Connect(function(player, action, ...)
         if not TestingService:isAdmin(player) then
-            warn(\"[TestingService] Unauthorized access attempt by \" .. player.Name)
+            warn("[TestingService] Unauthorized access attempt by " .. player.Name)
             return
         end
         
         local args = {...}
         
-        if action == \"HEAL\" then
+        if action == "HEAL" then
             TestingService:healPlayer(args[1] or player)
-        elseif action == \"GIVE_WEAPONS\" then
+        elseif action == "GIVE_WEAPONS" then
             TestingService:giveAllWeapons(args[1] or player)
-        elseif action == \"TELEPORT\" then
+        elseif action == "TELEPORT" then
             TestingService:teleportPlayer(player, args[1])
-        elseif action == \"FORCE_START\" then
+        elseif action == "FORCE_START" then
             TestingService:forceStartMatch()
-        elseif action == \"FORCE_END\" then
+        elseif action == "FORCE_END" then
             TestingService:forceEndMatch(args[1])
-        elseif action == \"SKIP_STORM\" then
+        elseif action == "SKIP_STORM" then
             TestingService:skipToStormPhase(args[1])
-        elseif action == \"SPAWN_DROP\" then
+        elseif action == "SPAWN_DROP" then
             TestingService:spawnSupplyDrop()
-        elseif action == \"TRIGGER_HAZARD\" then
+        elseif action == "TRIGGER_HAZARD" then
             TestingService:triggerHazard(args[1])
-        elseif action == \"SPAWN_BOTS\" then
+        elseif action == "SPAWN_BOTS" then
             TestingService:spawnFullGame()
-        elseif action == \"REMOVE_BOTS\" then
+        elseif action == "REMOVE_BOTS" then
             TestingService:removeAllBots()
-        elseif action == \"RUN_BALANCE_TEST\" then
+        elseif action == "RUN_BALANCE_TEST" then
             TestingService:runBalanceTest()
-        elseif action == \"RUN_MULTIPLAYER_TEST\" then
+        elseif action == "RUN_MULTIPLAYER_TEST" then
             TestingService:runMultiplayerTest(args[1] or 24)
-        elseif action == \"PERFORMANCE_REPORT\" then
+        elseif action == "PERFORMANCE_REPORT" then
             TestingService:getPerformanceReport()
         end
     end)
     
-    print(\"[TestingService] Initialized successfully\")
+    print("[TestingService] Initialized successfully")
 end
 
 return TestingService

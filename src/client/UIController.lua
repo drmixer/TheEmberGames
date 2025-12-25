@@ -10,8 +10,8 @@ local TweenService = game:GetService("TweenService")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
-local StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent")
-local LobbyRemoteEvent = ReplicatedStorage:WaitForChild("LobbyRemoteEvent")
+local StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent", 10)
+local LobbyRemoteEvent = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 10)
 
 local UIController = {}
 UIController.uiScreenGui = nil
@@ -263,75 +263,94 @@ function UIController.init()
     -- Create the UI
     createUI()
     
-    -- Connect to stats updates from server
-    StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-        local args = {...}
-        
-        if eventType == "INITIAL_STATS" then
-            local stats = args[1]
-            UIController.currentStats = stats
-            
-            -- Update all bars with initial values
-            if stats.health then
-                updateStatBar(UIController.healthBar, stats.health, stats.maxHealth or 100)
-            end
-            if stats.hunger then
-                updateStatBar(UIController.hungerBar, stats.hunger, stats.maxHunger or 100)
-            end
-            if stats.thirst then
-                updateStatBar(UIController.thirstBar, stats.thirst, stats.maxThirst or 100)
-            end
-            
-            UIController:updateStatusText()
-        elseif eventType == "STAT_UPDATE" then
-            local statName, newValue, oldValue = args[1], args[2], args[3]
-            UIController:updateStats(statName, newValue, oldValue)
-        elseif eventType == "STATUS_EFFECT_ADDED" then
-            local effectName = args[1]
-            -- Maybe show status effect indicator
-            print("Status effect applied: " .. effectName)
-        elseif eventType == "PLAYER_ELIMINATED" then
-            -- Handle elimination UI changes if this is the current player
-            local eliminatedUserId, eliminatedName = args[1], args[2]
-            if eliminatedUserId == Player.UserId then
-                -- This player was eliminated
-                UIController.statusText.Text = "ELIMINATED - Awaiting Tribute Ceremony"
-            else
-                -- Another player was eliminated
-                UIController.statusText.Text = eliminatedName .. " eliminated! Tribute count: TBA"
-            end
-        end
-    end)
+    -- Hide by default (show when match starts)
+    if UIController.uiScreenGui then
+        UIController.uiScreenGui.Enabled = false
+        UIController.uiVisible = false
+    end
     
-    -- Connect to lobby updates
-    LobbyRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-        local args = {...}
-        
-        if eventType == "COUNTDOWN_START" then
-            local timeLeft = args[1]
-            UIController:showCountdown(true, timeLeft)
-            UIController.statusText.Text = "Countdown to Games Beginning!"
-        elseif eventType == "COUNTDOWN_UPDATE" then
-            local timeLeft = args[1]
-            if UIController.countdownLabel then
-                UIController.countdownLabel.Text = tostring(timeLeft)
+    -- Connect to stats updates from server (if RemoteEvent exists)
+    if StatsRemoteEvent then
+        StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
+            
+            if eventType == "INITIAL_STATS" then
+                local stats = args[1]
+                UIController.currentStats = stats
+                
+                -- Update all bars with initial values
+                if stats.health then
+                    updateStatBar(UIController.healthBar, stats.health, stats.maxHealth or 100)
+                end
+                if stats.hunger then
+                    updateStatBar(UIController.hungerBar, stats.hunger, stats.maxHunger or 100)
+                end
+                if stats.thirst then
+                    updateStatBar(UIController.thirstBar, stats.thirst, stats.maxThirst or 100)
+                end
+                
+                UIController:updateStatusText()
+            elseif eventType == "STAT_UPDATE" then
+                local statName, newValue, oldValue = args[1], args[2], args[3]
+                UIController:updateStats(statName, newValue, oldValue)
+            elseif eventType == "STATUS_EFFECT_ADDED" then
+                local effectName = args[1]
+                -- Maybe show status effect indicator
+                print("Status effect applied: " .. effectName)
+            elseif eventType == "PLAYER_ELIMINATED" then
+                -- Handle elimination UI changes if this is the current player
+                local eliminatedUserId, eliminatedName = args[1], args[2]
+                if eliminatedUserId == Player.UserId then
+                    -- This player was eliminated
+                    UIController.statusText.Text = "ELIMINATED - Awaiting Tribute Ceremony"
+                else
+                    -- Another player was eliminated
+                    UIController.statusText.Text = eliminatedName .. " eliminated! Tribute count: TBA"
+                end
             end
-        elseif eventType == "COUNTDOWN_CANCELLED" then
-            UIController:showCountdown(false)
-            UIController.statusText.Text = "Match Delayed - Tributes Gathering"
-        elseif eventType == "MATCH_STARTING" then
-            UIController:showCountdown(true, 0)
-            task.wait(1)
-            UIController:showCountdown(false)
-            UIController.statusText.Text = "THE GAMES HAVE BEGUN!"
-        elseif eventType == "LOBBY_STATUS" then
-            local status = args[1]
-            UIController:handleLobbyStatus(status)
-        elseif eventType == "ASSIGN_DISTRICT" then
-            local districtNumber = args[1]
-            UIController.statusText.Text = "You are District " .. districtNumber
-        end
-    end)
+        end)
+    else
+        warn("[UIController] StatsRemoteEvent not found - stats display may not work")
+    end
+    
+    -- Connect to lobby updates (if RemoteEvent exists)
+    if LobbyRemoteEvent then
+        LobbyRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
+            
+            if eventType == "COUNTDOWN_START" then
+                local timeLeft = args[1]
+                UIController:showCountdown(true, timeLeft)
+                UIController.statusText.Text = "Countdown to Games Beginning!"
+            elseif eventType == "COUNTDOWN_UPDATE" then
+                local timeLeft = args[1]
+                if UIController.countdownLabel then
+                    UIController.countdownLabel.Text = tostring(timeLeft)
+                end
+            elseif eventType == "COUNTDOWN_CANCELLED" then
+                UIController:showCountdown(false)
+                UIController.statusText.Text = "Match Delayed - Tributes Gathering"
+            elseif eventType == "MATCH_STARTING" then
+                -- Show the HUD when match starts
+                if UIController.uiScreenGui then
+                    UIController.uiScreenGui.Enabled = true
+                    UIController.uiVisible = true
+                end
+                UIController:showCountdown(true, 0)
+                task.wait(1)
+                UIController:showCountdown(false)
+                UIController.statusText.Text = "THE GAMES HAVE BEGUN!"
+            elseif eventType == "LOBBY_STATUS" then
+                local status = args[1]
+                UIController:handleLobbyStatus(status)
+            elseif eventType == "ASSIGN_DISTRICT" then
+                local districtNumber = args[1]
+                UIController.statusText.Text = "You are District " .. districtNumber
+            end
+        end)
+    else
+        warn("[UIController] LobbyRemoteEvent not found - lobby updates may not work")
+    end
     
     print("UIController initialized and connected to events")
 end

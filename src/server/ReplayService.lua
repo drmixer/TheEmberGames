@@ -8,8 +8,19 @@ local HttpService = game:GetService("HttpService")
 local DataStoreService = game:GetService("DataStoreService")
 
 local ReplayService = {}
+ReplayService.datastoreEnabled = false
 
-local ReplayDataStore = DataStoreService:GetDataStore("EmberGames_Replays_v1")
+-- DataStore reference (wrapped in pcall for Studio testing)
+local ReplayDataStore
+local success, err = pcall(function()
+    ReplayDataStore = DataStoreService:GetDataStore("EmberGames_Replays_v1")
+end)
+
+if success then
+    ReplayService.datastoreEnabled = true
+else
+    warn("[ReplayService] DataStore not available (Studio mode)")
+end
 
 -- Active recording
 local currentRecording = nil
@@ -189,6 +200,11 @@ end
 
 -- Save replay to DataStore
 function ReplayService:saveReplay(replayData)
+    if not ReplayService.datastoreEnabled or not ReplayDataStore then
+        print("[ReplayService] Skipping save (Studio mode)")
+        return
+    end
+    
     local code = replayData.code
     
     -- Compress event data (convert to smaller format)
@@ -216,6 +232,10 @@ end
 
 -- Load replay from DataStore
 function ReplayService:loadReplay(code)
+    if not ReplayService.datastoreEnabled or not ReplayDataStore then
+        return nil
+    end
+    
     local success, data = pcall(function()
         return ReplayDataStore:GetAsync("Replay_" .. code)
     end)

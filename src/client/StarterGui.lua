@@ -10,8 +10,8 @@ local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
-local LobbyRemoteEvent = ReplicatedStorage:WaitForChild("LobbyRemoteEvent")
-local ArenaRemoteEvent = ReplicatedStorage:WaitForChild("ArenaRemoteEvent")
+local LobbyRemoteEvent = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 10)
+local ArenaRemoteEvent = ReplicatedStorage:WaitForChild("ArenaRemoteEvent", 10)
 
 local StarterGui = {}
 
@@ -249,67 +249,80 @@ function StarterGui.init()
     -- Create the main UI
     createMainUI()
     
-    -- Connect to lobby events
-    LobbyRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-        local args = {...}
-        
-        if eventType == "ASSIGN_DISTRICT" then
-            local districtNumber = args[1]
-            assignDistrict(districtNumber)
-        elseif eventType == "COUNTDOWN_START" then
-            -- Countdown is starting
-            StarterGui.gameState = "Countdown"
-            if StarterGui.countdownFrame then
-                StarterGui.countdownFrame.Visible = true
-                StarterGui.lobbyFrame.Visible = false
-                StarterGui.tributeDisplay.Visible = false
-            end
-        elseif eventType == "COUNTDOWN_UPDATE" then
-            local timeLeft = args[1]
-            if StarterGui.countdownFrame then
-                local countdownNumber = StarterGui.countdownFrame:FindFirstChild("CountdownNumber")
-                if countdownNumber then
-                    countdownNumber.Text = tostring(math.ceil(timeLeft))
-                    
-                    -- Add dramatic effect as time gets low
-                    if timeLeft <= 10 then
-                        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                        local tween = TweenService:Create(countdownNumber, tweenInfo, {
-                            TextColor3 = Color3.fromRGB(255, 50, 50), -- Red
-                            Font = Enum.Font.GothamBlack
-                        })
-                        tween:Play()
+    -- Hide by default (MainMenuUI is the main menu now)
+    if StarterGui.mainScreenGui then
+        StarterGui.mainScreenGui.Enabled = false
+    end
+    
+    -- Connect to lobby events (if RemoteEvent exists)
+    if LobbyRemoteEvent then
+        LobbyRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
+            
+            if eventType == "ASSIGN_DISTRICT" then
+                local districtNumber = args[1]
+                assignDistrict(districtNumber)
+            elseif eventType == "COUNTDOWN_START" then
+                -- Countdown is starting
+                StarterGui.gameState = "Countdown"
+                if StarterGui.countdownFrame then
+                    StarterGui.countdownFrame.Visible = true
+                    StarterGui.lobbyFrame.Visible = false
+                    StarterGui.tributeDisplay.Visible = false
+                end
+            elseif eventType == "COUNTDOWN_UPDATE" then
+                local timeLeft = args[1]
+                if StarterGui.countdownFrame then
+                    local countdownNumber = StarterGui.countdownFrame:FindFirstChild("CountdownNumber")
+                    if countdownNumber then
+                        countdownNumber.Text = tostring(math.ceil(timeLeft))
+                        
+                        -- Add dramatic effect as time gets low
+                        if timeLeft <= 10 then
+                            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                            local tween = TweenService:Create(countdownNumber, tweenInfo, {
+                                TextColor3 = Color3.fromRGB(255, 50, 50), -- Red
+                                Font = Enum.Font.GothamBlack
+                            })
+                            tween:Play()
+                        end
                     end
                 end
+            elseif eventType == "COUNTDOWN_CANCELLED" then
+                StarterGui.gameState = "Lobby"
+                if StarterGui.lobbyFrame then
+                    StarterGui.lobbyFrame.Visible = true
+                    StarterGui.countdownFrame.Visible = false
+                end
+            elseif eventType == "MATCH_STARTING" then
+                StarterGui.gameState = "ArenaEntry"
+                if StarterGui.tributeDisplay then
+                    StarterGui.tributeDisplay.Visible = true
+                    StarterGui.countdownFrame.Visible = false
+                end
+            elseif eventType == "LOBBY_STATUS" then
+                local status = args[1]
+                updateLobbyUI(status)
             end
-        elseif eventType == "COUNTDOWN_CANCELLED" then
-            StarterGui.gameState = "Lobby"
-            if StarterGui.lobbyFrame then
-                StarterGui.lobbyFrame.Visible = true
-                StarterGui.countdownFrame.Visible = false
-            end
-        elseif eventType == "MATCH_STARTING" then
-            StarterGui.gameState = "ArenaEntry"
-            if StarterGui.tributeDisplay then
-                StarterGui.tributeDisplay.Visible = true
-                StarterGui.countdownFrame.Visible = false
-            end
-        elseif eventType == "LOBBY_STATUS" then
-            local status = args[1]
-            updateLobbyUI(status)
-        end
-    end)
+        end)
+    else
+        warn("[StarterGui] LobbyRemoteEvent not found - lobby UI may not work")
+    end
     
-    -- Connect to arena events
-    ArenaRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-        if eventType == "ARENA_INITIALIZED" then
-            print("Arena initialized - game starting!")
-            -- Hide all lobby UI, show game UI
-            if StarterGui.mainScreenGui then
-                StarterGui.mainScreenGui.Enabled = false
+    -- Connect to arena events (if RemoteEvent exists)
+    if ArenaRemoteEvent then
+        ArenaRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            if eventType == "ARENA_INITIALIZED" then
+                print("Arena initialized - game starting!")
+                -- Hide all lobby UI, show game UI
+                if StarterGui.mainScreenGui then
+                    StarterGui.mainScreenGui.Enabled = false
+                end
             end
-        end
-    end)
+        end)
+    else
+        warn("[StarterGui] ArenaRemoteEvent not found - arena events may not work")
+    end
     
     print("StarterGui initialized and connected to events")
 end

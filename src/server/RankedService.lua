@@ -6,8 +6,21 @@ local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RankedService = {}
+RankedService.datastoreEnabled = false
 
-local RankDataStore = DataStoreService:GetDataStore("EmberGames_RankedData_v1")
+-- DataStore reference (wrapped in pcall for Studio testing)
+local RankDataStore
+local success, err = pcall(function()
+    RankDataStore = DataStoreService:GetDataStore("EmberGames_RankedData_v1")
+end)
+
+if success then
+    RankedService.datastoreEnabled = true
+    print("[RankedService] DataStore access enabled")
+else
+    warn("[RankedService] DataStore not available (Studio mode)")
+    RankedService.datastoreEnabled = false
+end
 
 -- Rank tiers
 local RANK_TIERS = {
@@ -76,6 +89,22 @@ end
 
 -- Load player ranked data
 function RankedService:loadPlayerData(player)
+    -- If DataStore not available, use defaults
+    if not RankedService.datastoreEnabled or not RankDataStore then
+        playerRanks[player.UserId] = {
+            mmr = CONFIG.STARTING_MMR,
+            gamesPlayed = 0,
+            wins = 0,
+            kills = 0,
+            placementGamesLeft = CONFIG.PLACEMENT_GAMES,
+            seasonWins = 0,
+            seasonKills = 0,
+            peakMMR = CONFIG.STARTING_MMR,
+            lastSeason = 0,
+        }
+        return playerRanks[player.UserId]
+    end
+    
     local key = "Ranked_" .. player.UserId
     
     local success, data = pcall(function()
@@ -104,6 +133,8 @@ end
 
 -- Save player ranked data
 function RankedService:savePlayerData(player)
+    if not RankedService.datastoreEnabled or not RankDataStore then return end
+    
     local data = playerRanks[player.UserId]
     if not data then return end
     

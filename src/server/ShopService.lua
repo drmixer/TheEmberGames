@@ -7,8 +7,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataStoreService = game:GetService("DataStoreService")
 
 local ShopService = {}
+ShopService.datastoreEnabled = false
 
-local ShopDataStore = DataStoreService:GetDataStore("EmberGames_Shop_v1")
+-- DataStore reference (wrapped in pcall for Studio testing)
+local ShopDataStore
+local success, err = pcall(function()
+    ShopDataStore = DataStoreService:GetDataStore("EmberGames_Shop_v1")
+end)
+
+if success then
+    ShopService.datastoreEnabled = true
+else
+    warn("[ShopService] DataStore not available (Studio mode)")
+end
 
 -- Shop items (would be configured in production)
 local SHOP_ITEMS = {
@@ -48,6 +59,16 @@ local playerShopData = {}
 
 -- Load player shop data
 function ShopService:loadPlayerData(player)
+    -- If DataStore not available, use defaults
+    if not ShopService.datastoreEnabled or not ShopDataStore then
+        playerShopData[player.UserId] = {
+            embers = 0,
+            purchaseHistory = {},
+            hasBattlePass = false,
+        }
+        return playerShopData[player.UserId]
+    end
+    
     local key = "Shop_" .. player.UserId
     
     local success, data = pcall(function()
@@ -69,6 +90,8 @@ end
 
 -- Save player shop data
 function ShopService:savePlayerData(player)
+    if not ShopService.datastoreEnabled or not ShopDataStore then return end
+    
     local data = playerShopData[player.UserId]
     if not data then return end
     

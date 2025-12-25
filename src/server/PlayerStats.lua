@@ -12,7 +12,7 @@ local Config = require(ReplicatedFirst.Config)
 -- Try to load BalanceConfig for tunable values
 local BalanceConfig = nil
 pcall(function()
-    BalanceConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("shared"):WaitForChild("BalanceConfig", 2))
+    BalanceConfig = require(ReplicatedFirst:WaitForChild("BalanceConfig", 2))
 end)
 
 local PlayerStats = {}
