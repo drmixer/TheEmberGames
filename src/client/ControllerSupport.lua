@@ -54,17 +54,23 @@ end
 function ControllerSupport:checkInputType()
     local inputType = UserInputService:GetLastInputType()
     
+    local wasUsingController = ControllerSupport.isUsingController
+    
     if inputType == Enum.UserInputType.Gamepad1 or 
        inputType == Enum.UserInputType.Gamepad2 or 
        inputType == Enum.UserInputType.Gamepad3 or 
        inputType == Enum.UserInputType.Gamepad4 then
         ControllerSupport.isUsingController = true
-        ControllerSupport:applyControllerUI()
-        print("Controller detected - adjusting UI")
+        if not wasUsingController then
+            ControllerSupport:applyControllerUI()
+            print("Controller detected - adjusting UI")
+        end
     else
         ControllerSupport.isUsingController = false
-        ControllerSupport:applyKeyboardUI()
-        print("Keyboard/Mouse detected - adjusting UI")
+        if wasUsingController then
+            ControllerSupport:applyKeyboardUI()
+            print("Keyboard/Mouse detected - adjusting UI")
+        end
     end
 end
 

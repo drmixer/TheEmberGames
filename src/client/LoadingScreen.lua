@@ -118,8 +118,7 @@ local function createLoadingScreen()
     subtitle.Font = UITheme.Fonts.Label
     subtitle.TextSize = 14
     subtitle.TextColor3 = UITheme.Colors.TextDim
-    subtitle.LetterSpacing = 4 -- Wide clean cinematic look (Simulated by font choice mainly in Roblox)
-    title.Parent = centerContainer
+    -- Note: LetterSpacing doesn't exist in Roblox, removed
     subtitle.Parent = centerContainer
     
     -- Loading Bar Section (Bottom)
@@ -233,10 +232,8 @@ function LoadingScreen:hide()
     task.wait(0.8)
     
     -- Cinematic Fade Out
-    -- 1. Fade out text first
+    -- Fade out text elements
     local fadeInfo = TweenInfo.new(0.8)
-    TweenService:Create(LoadingScreen.centerContainer, fadeInfo, {GroupTransparency = 1}):Play() -- Needs CanvasGroup normally, but for frames we improvise
-    -- Actually, let's just fade background content
     
     if LoadingScreen.centerContainer then
         for _, c in pairs(LoadingScreen.centerContainer:GetChildren()) do

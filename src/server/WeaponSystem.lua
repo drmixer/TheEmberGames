@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local Config = require(ReplicatedFirst.Config)
 
 local WeaponSystem = {}
 WeaponSystem.equippedWeapons = {} -- player -> weapon instance
@@ -33,7 +34,7 @@ local WEAPONS = {
         rarity = "common",
         description = "A basic wooden stick. Fast but weak.",
         model = {
-            handleSize = Vector3.new(0.3, 4, 0.3),
+            handleSize = Vector3.new(0.5, 4.5, 0.5), -- Made thicker and longer for visibility
             handleColor = Color3.fromRGB(139, 90, 43),
             handleMaterial = Enum.Material.Wood,
             bladeSize = nil,
@@ -800,6 +801,11 @@ end
 
 -- Reduce weapon durability
 function WeaponSystem:reduceDurability(player, weapon)
+    -- Check if durability is enabled
+    if not Config.WEAPON_DURABILITY_ENABLED then
+        return -- Durability disabled, don't reduce
+    end
+    
     local currentDurability = weapon:GetAttribute("CurrentDurability") or 1
     currentDurability = currentDurability - 1
     
@@ -944,37 +950,79 @@ function WeaponSystem.init()
             end
             
         elseif action == "MELEE_HIT" then
-            local targetPlayer = args[1]
+            local target = args[1] -- Can be Player OR Bot Model
             local hitPos = args[2]
             
-            if targetPlayer and hitPos then
+            if target and hitPos then
                 local character = player.Character
                 if not character then return end
                 
                 local tool = character:FindFirstChildOfClass("Tool")
                 if not tool or tool:GetAttribute("Type") ~= "melee" then return end
                 
-                -- Server-Side Verification (Anti-Cheat/Lag Comp)
                 local attPos = character.HumanoidRootPart.Position
-                local targetChar = targetPlayer.Character
                 
-                if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+                -- Determine if target is a Player or a Bot
+                local targetChar = nil
+                local targetHumanoid = nil
+                local isBot = false
+                
+                if typeof(target) == "Instance" then
+                    -- It's a bot model passed directly
+                    if target:IsA("Model") and target:FindFirstChild("Humanoid") then
+                        targetChar = target
+                        targetHumanoid = target.Humanoid
+                        isBot = target:FindFirstChild("IsBot") ~= nil
+                    end
+                elseif target.Character then
+                    -- It's a Player
+                    targetChar = target.Character
+                    targetHumanoid = targetChar:FindFirstChild("Humanoid")
+                end
+                
+                if targetChar and targetChar:FindFirstChild("HumanoidRootPart") and targetHumanoid then
                     local targetPos = targetChar.HumanoidRootPart.Position
                     
-                    -- 1. Distance Check (Range + Buffer for lag)
+                    -- Distance Check (Range + Buffer for lag)
                     local range = tool:GetAttribute("Range") or 5
-                    local maxDist = range + 5 -- Generous 5 stud buffer for latency
+                    local maxDist = range + 8 -- Generous buffer
                     local dist = (attPos - targetPos).Magnitude
                     
                     if dist <= maxDist then
-                        -- 2. Cooldown Check (sanity)
-                        -- Allow slightly faster than attack speed to prevent rejection of valid spam
-                        -- local lastAttack = WeaponSystem.weaponCooldowns[player] or 0
-                        -- if tick() - lastAttack > 0.1 then 
-                            
-                            -- Valid Hit!
-                            WeaponSystem:applyDamage(player, targetPlayer, tool, hitPos)
-                        -- end
+                        -- Apply damage directly to humanoid
+                        local damage = tool:GetAttribute("Damage") or 10
+                        local isCrit = math.random() < Config.CRITICAL_HIT_CHANCE
+                        if isCrit then
+                            damage = damage * Config.CRITICAL_HIT_MULTIPLIER
+                        end
+                        
+                        targetHumanoid:TakeDamage(damage)
+                        print("[WeaponSystem] " .. player.Name .. " hit " .. targetChar.Name .. " for " .. damage .. (isCrit and " (CRIT!)" or ""))
+                        
+                        -- Update cooldown and durability
+                        WeaponSystem.weaponCooldowns[player] = tick()
+                        WeaponSystem:reduceDurability(player, tool)
+                        
+                        -- Notify clients of hit
+                        weaponSystemRemote:FireAllClients("DAMAGE_DEALT", player.UserId, targetChar.Name, damage, hitPos, isCrit)
+                        
+                        -- Check for kill
+                        if targetHumanoid.Health <= 0 then
+                            if isBot then
+                                -- Bot killed - notify BotController
+                                local success, BotController = pcall(function()
+                                    return require(script.Parent.BotController)
+                                end)
+                                if success then
+                                    for _, bot in pairs(BotController.bots) do
+                                        if bot.character == targetChar then
+                                            BotController:eliminateBot(bot)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
                     else
                         warn(player.Name .. " hit rejected: Too far ("..math.floor(dist).."/"..range..")")
                     end

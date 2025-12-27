@@ -225,12 +225,39 @@ local function playAttackAnimation(animName)
     local animId = ANIMATION_IDS[animName]
     if not animId then return end
     
-    local animator = hum:FindFirstChild("Animator") or Instance.new("Animator", hum)
-    local anim = Instance.new("Animation")
-    anim.AnimationId = animId
-    local track = animator:LoadAnimation(anim)
-    track:Play()
-    return track
+    -- Try to play animation (may fail if asset unavailable)
+    local success, track = pcall(function()
+        local animator = hum:FindFirstChild("Animator") or Instance.new("Animator", hum)
+        local anim = Instance.new("Animation")
+        anim.AnimationId = animId
+        return animator:LoadAnimation(anim)
+    end)
+    
+    if success and track then
+        track:Play()
+        return track
+    end
+    
+    -- Fallback: Simple arm swing using Motor6D
+    -- This works even when animation fails
+    local rightArm = char:FindFirstChild("Right Arm") or char:FindFirstChild("RightUpperArm")
+    local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    
+    if torso and rightArm then
+        local shoulder = torso:FindFirstChild("Right Shoulder") or torso:FindFirstChild("RightShoulder")
+        if shoulder then
+            local originalC0 = shoulder.C0
+            -- Quick swing animation
+            task.spawn(function()
+                local swingDown = originalC0 * CFrame.Angles(math.rad(-80), 0, 0)
+                shoulder.C0 = swingDown
+                task.wait(0.15)
+                shoulder.C0 = originalC0
+            end)
+        end
+    end
+    
+    return nil
 end
 
 -- ============ ATTACK LOGIC ============
@@ -252,6 +279,32 @@ local function performMeleeAttack()
     
     playSound(SOUND_IDS.SWING_WHOOSH, 0.8, math.random(90,110)/100)
     shakeCamera(0.5)
+    
+    -- Simple weapon swing animation using the tool handle
+    local handle = tool:FindFirstChild("Handle")
+    if handle then
+        task.spawn(function()
+            -- Create a quick rotation effect on the tool
+            local originalCFrame = handle.CFrame
+            local swingOffset = CFrame.Angles(math.rad(-60), 0, math.rad(20))
+            
+            -- Quick swing down (0.1s)
+            local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+            local swingTween = TweenService:Create(handle, tweenInfo, {
+                CFrame = handle.CFrame * swingOffset
+            })
+            swingTween:Play()
+            swingTween.Completed:Wait()
+            
+            -- Return to original (0.2s)
+            local returnTween = TweenService:Create(handle, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                CFrame = originalCFrame
+            })
+            returnTween:Play()
+        end)
+    end
+    
+    -- Try loading animation (may fail)
     playAttackAnimation("SWING_OVERHEAD")
     
     -- Client-Side Hit Detection (Responsive!)
@@ -279,16 +332,17 @@ local function performMeleeAttack()
         end
     end
     
-    -- Cone check fallback (Wide Swing)
+    -- Cone check fallback (Wide Swing) - Check BOTH players AND bots
     if not targetFound then
+        -- Check players
         for _, otherPlayer in pairs(Players:GetPlayers()) do
             if otherPlayer ~= Player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local otherHrp = otherPlayer.Character.HumanoidRootPart
                 local vecTo = otherHrp.Position - origin
                 local dist = vecTo.Magnitude
                 if dist < range then
-                    local angle = math.acos(vecTo.Unit:Dot(Camera.CFrame.LookVector))
-                    if angle < math.rad(45) then -- 45 degree cone
+                    local angle = math.acos(math.clamp(vecTo.Unit:Dot(Camera.CFrame.LookVector), -1, 1))
+                    if angle < math.rad(60) then -- 60 degree cone
                         targetFound = otherPlayer
                         hitPos = otherHrp.Position
                         break
@@ -296,17 +350,39 @@ local function performMeleeAttack()
                 end
             end
         end
+        
+        -- Check bots (models with IsBot tag)
+        if not targetFound then
+            for _, model in pairs(workspace:GetChildren()) do
+                if model:FindFirstChild("IsBot") and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
+                    local hum = model.Humanoid
+                    if hum.Health > 0 then
+                        local botHrp = model.HumanoidRootPart
+                        local vecTo = botHrp.Position - origin
+                        local dist = vecTo.Magnitude
+                        if dist < range then
+                            local angle = math.acos(math.clamp(vecTo.Unit:Dot(Camera.CFrame.LookVector), -1, 1))
+                            if angle < math.rad(60) then
+                                targetFound = model -- Bot model, not player
+                                hitPos = botHrp.Position
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
     
     if targetFound then
-        -- Predict hit locally (Instant Feedback)
-        -- We don't show damage numbers yet (server confirms amount), but we can show blood impact
+        -- Show hit feedback
         local CombatFeedback = require(script.Parent:WaitForChild("CombatFeedback"))
         CombatFeedback:showHitMarker(false) -- optimistic marker
         
         if WeaponSystemRemote then
             WeaponSystemRemote:FireServer("MELEE_HIT", targetFound, hitPos)
         end
+        print("[WeaponController] Hit " .. (targetFound.Name or "target"))
     else
         -- Just Swing
         if WeaponSystemRemote then

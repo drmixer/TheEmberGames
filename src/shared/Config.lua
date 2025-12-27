@@ -23,7 +23,7 @@ Config.PLAYER_CAP = 24 -- Maximum number of players per match
 Config.STORM_PHASES = 7 -- Number of storm phases in the game
 
 -- Bot settings
-Config.BOTS_ENABLED = true -- Whether to fill empty slots with AI bots
+Config.BOTS_ENABLED = true -- RE-ENABLED with improved AI
 Config.BOT_FILL_COUNT = 23 -- How many bots to spawn (24 total - 1 player = 23 bots for solo)
 
 -- Player stats
@@ -35,7 +35,7 @@ Config.MAX_THIRST = 100
 Config.ARENA_SIZE = 1024 -- Size of the square arena in studs
 
 -- Combat settings
-Config.WEAPON_DURABILITY_ENABLED = true -- Whether weapons break after extended use
+Config.WEAPON_DURABILITY_ENABLED = false -- DISABLED FOR TESTING - weapons were breaking too fast
 Config.CRITICAL_HIT_CHANCE = 0.1 -- 10% chance for critical hits
 Config.CRITICAL_HIT_MULTIPLIER = 2 -- 2x damage for critical hits
 

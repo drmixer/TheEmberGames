@@ -93,19 +93,22 @@ function UITheme.createButton(props)
     label.TextSize = 18
     label.Parent = button
     
+    local originalSize = props.Size or UDim2.new(0, 200, 0, 50)
+    local originalPos = props.Position or UDim2.new(0, 0, 0, 0)
+    
     -- Animations
     button.MouseEnter:Connect(function()
         AudioController:playUISound("UI_HOVER")
         
         TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = UITheme.Colors.SurfaceHighlight}):Play()
         TweenService:Create(stroke, TweenInfo.new(0.2), {Transparency = 0, Color = UITheme.Colors.Gold}):Play()
-        TweenService:Create(button, TweenInfo.new(0.1), {Size = props.Size + UDim2.new(0, 4, 0, 4), Position = props.Position - UDim2.new(0, 2, 0, 2)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.1), {Size = originalSize + UDim2.new(0, 4, 0, 4), Position = originalPos - UDim2.new(0, 2, 0, 2)}):Play()
     end)
     
     button.MouseLeave:Connect(function()
         TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = UITheme.Colors.Surface}):Play()
         TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 0.5, Color = UITheme.Colors.GoldDim}):Play()
-        TweenService:Create(button, TweenInfo.new(0.2), {Size = props.Size, Position = props.Position}):Play()
+        TweenService:Create(button, TweenInfo.new(0.2), {Size = originalSize, Position = originalPos}):Play()
     end)
     
     button.MouseButton1Click:Connect(function()

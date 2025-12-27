@@ -212,7 +212,7 @@ function KillFeed:addKill(killerName, victimName, weaponType, isBetrayal)
     })
     
     -- Remove excess items
-    while #KillFeed.items > CONFIG.maxItems do
+    while #KillFeed.items > KillFeed.maxItems do
         local oldItem = table.remove(KillFeed.items, 1)
         if oldItem.frame then
             oldItem.frame:Destroy()

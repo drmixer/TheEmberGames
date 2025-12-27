@@ -80,8 +80,9 @@ local function generateColumn(x, z, biomeData)
         seaLevel = 2 
     end
     
-    -- Fill Ground
-    Workspace.Terrain:FillBlock(CFrame.new(x, height/2 - 10, z), Vector3.new(4, height + 20, 4), material)
+    -- Fill Ground (Ensure positive extents)
+    local fillHeight = math.max(1, height + 20)
+    Workspace.Terrain:FillBlock(CFrame.new(x, height/2 - 10, z), Vector3.new(4, fillHeight, 4), material)
     
     -- Fill Water if below sea level
     if height < seaLevel then
@@ -93,6 +94,17 @@ local function generateColumn(x, z, biomeData)
     end
     
     return height
+end
+
+-- Helper: Get or create decoration folder
+local function getDecorationFolder()
+    local folder = Workspace:FindFirstChild("ArenaDecorations")
+    if not folder then
+        folder = Instance.new("Folder")
+        folder.Name = "ArenaDecorations"
+        folder.Parent = Workspace
+    end
+    return folder
 end
 
 -- Helper: Spawn harvestable resource node
@@ -174,21 +186,14 @@ local function spawnResourceNode(resourceName, resourceData, position)
 end
 
 function TerrainGenerator:spawnDecorations(biomeData)
-    -- Fix: Correctly require from ReplicatedStorage (assuming src/shared maps there)
+    -- BiomeResources is in ReplicatedFirst (src/shared maps there per Rojo config)
     local BiomeResources 
     local success, module = pcall(function()
-        return require(game:GetService("ReplicatedStorage"):WaitForChild("BiomeResources")) 
+        return require(game:GetService("ReplicatedFirst"):WaitForChild("BiomeResources", 5)) 
     end)
     
-    if not success then
-        -- Fallback if mapped differently (e.g. inside a Shared folder)
-        success, module = pcall(function()
-             return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("BiomeResources"))
-        end)
-    end
-    
-    if not success then
-        warn("[TerrainGenerator] Failed to load BiomeResources!")
+    if not success or not module then
+        warn("[TerrainGenerator] BiomeResources not found, using basic spawning")
         return
     end
     BiomeResources = module

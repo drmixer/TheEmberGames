@@ -170,7 +170,8 @@ local TESTS = {
         category = "performance",
         run = function()
             local Stats = game:GetService("Stats")
-            local memory = Stats:GetMemoryUsageMbForTag(Enum.MemoryTag.Runtime) or 0
+            -- Use GetTotalMemoryUsageMb instead of MemoryTag (which doesn't exist)
+            local memory = Stats:GetTotalMemoryUsageMb() or 0
             
             if memory > 500 then
                 return false, "High memory usage: " .. math.floor(memory) .. "MB"

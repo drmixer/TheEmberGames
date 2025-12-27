@@ -1,11 +1,12 @@
 -- ModuleScript: BotController.lua
 -- AI Bot system for The Ember Games
 -- Spawns and controls bot tributes for solo play or player fill
+-- IMPROVED: More natural behavior, less aggressive, visible attacks
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local PathfindingService = game:GetService("PathfindingService")
+local TweenService = game:GetService("TweenService")
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Config = require(ReplicatedFirst.Config)
@@ -13,7 +14,7 @@ local Config = require(ReplicatedFirst.Config)
 local BotController = {}
 BotController.bots = {}
 BotController.botCount = 0
-BotController.maxBots = 23 -- Max bots to fill a 24 player game
+BotController.maxBots = 23
 BotController.isActive = false
 
 -- Bot names for variety
@@ -28,25 +29,31 @@ local BOT_NAMES = {
     "Career_Hunter", "Career_Fighter", "Survivor_1", "Survivor_2"
 }
 
--- Bot difficulty levels
+-- BALANCED Bot difficulty levels (more aggressive now)
 local DIFFICULTY = {
     EASY = {
-        reactionTime = 1.5,
-        accuracy = 0.3,
-        aggressiveness = 0.3,
-        speed = 12,
+        reactionTime = 2.5,      -- React time
+        accuracy = 0.3,          -- 30% hit chance
+        aggressiveness = 0.3,    -- Will fight if close
+        speed = 11,              -- Slow-ish movement
+        attackCooldown = 3.0,    -- 3 seconds between attacks
+        detectionRange = 25,     -- Notices nearby
     },
     MEDIUM = {
-        reactionTime = 0.8,
-        accuracy = 0.5,
-        aggressiveness = 0.5,
-        speed = 14,
+        reactionTime = 1.5,      -- Moderate reaction
+        accuracy = 0.45,         -- 45% hit chance
+        aggressiveness = 0.5,    -- Often attacks
+        speed = 13,              -- Normal speed
+        attackCooldown = 2.0,    -- 2 seconds between attacks
+        detectionRange = 40,     -- Good awareness
     },
     HARD = {
-        reactionTime = 0.4,
-        accuracy = 0.7,
-        aggressiveness = 0.7,
-        speed = 16,
+        reactionTime = 0.8,      -- Fast reaction
+        accuracy = 0.6,          -- 60% hit chance
+        aggressiveness = 0.7,    -- Very aggressive
+        speed = 15,              -- Fast
+        attackCooldown = 1.5,    -- 1.5 seconds between attacks
+        detectionRange = 55,     -- Great awareness
     }
 }
 
@@ -82,17 +89,16 @@ local function createBotCharacter(botData)
     head.Name = "Head"
     head.Size = Vector3.new(1.2, 1.2, 1.2)
     head.Shape = Enum.PartType.Ball
-    head.Color = Color3.fromRGB(255, 204, 153) -- Skin color
+    head.Color = Color3.fromRGB(255, 204, 153)
     head.CanCollide = false
     head.Parent = character
     
-    -- Create face
     local face = Instance.new("Decal")
     face.Name = "face"
     face.Texture = "rbxasset://textures/face.png"
     face.Parent = head
     
-    -- Left Arm
+    -- Arms
     local leftArm = Instance.new("Part")
     leftArm.Name = "Left Arm"
     leftArm.Size = Vector3.new(1, 2, 1)
@@ -100,7 +106,6 @@ local function createBotCharacter(botData)
     leftArm.CanCollide = false
     leftArm.Parent = character
     
-    -- Right Arm
     local rightArm = Instance.new("Part")
     rightArm.Name = "Right Arm"
     rightArm.Size = Vector3.new(1, 2, 1)
@@ -108,7 +113,7 @@ local function createBotCharacter(botData)
     rightArm.CanCollide = false
     rightArm.Parent = character
     
-    -- Left Leg
+    -- Legs
     local leftLeg = Instance.new("Part")
     leftLeg.Name = "Left Leg"
     leftLeg.Size = Vector3.new(1, 2, 1)
@@ -116,13 +121,21 @@ local function createBotCharacter(botData)
     leftLeg.CanCollide = false
     leftLeg.Parent = character
     
-    -- Right Leg
     local rightLeg = Instance.new("Part")
     rightLeg.Name = "Right Leg"
     rightLeg.Size = Vector3.new(1, 2, 1)
     rightLeg.Color = Color3.fromRGB(100, 100, 100)
     rightLeg.CanCollide = false
     rightLeg.Parent = character
+    
+    -- Simple weapon visual
+    local weapon = Instance.new("Part")
+    weapon.Name = "Weapon"
+    weapon.Size = Vector3.new(0.3, 3, 0.3)
+    weapon.Color = Color3.fromRGB(139, 90, 43) -- Wood color
+    weapon.Material = Enum.Material.Wood
+    weapon.CanCollide = false
+    weapon.Parent = character
     
     -- Welds
     local function createMotor(name, part0, part1, c0, c1)
@@ -143,16 +156,21 @@ local function createBotCharacter(botData)
     createMotor("Left Hip", torso, leftLeg, CFrame.new(-0.5, -1, 0), CFrame.new(0, 1, 0))
     createMotor("Right Hip", torso, rightLeg, CFrame.new(0.5, -1, 0), CFrame.new(0, 1, 0))
     
-    -- Set primary part
+    -- Attach weapon to right arm
+    local weaponWeld = Instance.new("Weld")
+    weaponWeld.Part0 = rightArm
+    weaponWeld.Part1 = weapon
+    weaponWeld.C0 = CFrame.new(0, -1.5, 0)
+    weaponWeld.Parent = rightArm
+    
     character.PrimaryPart = hrp
     
-    -- Bot tag
+    -- Tags
     local botTag = Instance.new("BoolValue")
     botTag.Name = "IsBot"
     botTag.Value = true
     botTag.Parent = character
     
-    -- District tag
     local districtTag = Instance.new("IntValue")
     districtTag.Name = "District"
     districtTag.Value = botData.district
@@ -167,32 +185,32 @@ function BotController:createBot(district, difficulty)
     BotController.botCount = botId
     
     local botName = BOT_NAMES[math.random(1, #BOT_NAMES)] .. "_" .. botId
-    local difficultyData = difficulty or DIFFICULTY.MEDIUM
+    local difficultyData = difficulty or DIFFICULTY.EASY -- Default to EASY now
     
     local botData = {
         id = botId,
         name = botName,
         district = district or math.random(1, 12),
         difficulty = difficultyData,
-        state = "idle", -- idle, roaming, hunting, fleeing, looting
+        state = "idle",
         target = nil,
         health = 100,
         isAlive = true,
         character = nil,
         lastAction = tick(),
+        lastAttack = 0, -- Track attack cooldown
         inventory = {},
     }
     
-    -- Create character
     local character = createBotCharacter(botData)
     botData.character = character
     
-    -- Spawn at random position in arena
+    -- Spawn at random position
     local arenaSize = Config.ARENA_SIZE / 2
     local spawnPos = Vector3.new(
-        math.random(-arenaSize * 0.8, arenaSize * 0.8),
-        50, -- High up to fall onto terrain
-        math.random(-arenaSize * 0.8, arenaSize * 0.8)
+        math.random(-arenaSize * 0.6, arenaSize * 0.6),
+        50,
+        math.random(-arenaSize * 0.6, arenaSize * 0.6)
     )
     character:SetPrimaryPartCFrame(CFrame.new(spawnPos))
     character.Parent = workspace
@@ -201,7 +219,6 @@ function BotController:createBot(district, difficulty)
     
     print("[BotController] Created bot: " .. botName .. " (District " .. botData.district .. ")")
     
-    -- Start bot AI
     BotController:startBotAI(botData)
     
     return botData
@@ -210,6 +227,9 @@ end
 -- Start bot AI behavior
 function BotController:startBotAI(botData)
     task.spawn(function()
+        -- Initial delay - bots don't act immediately
+        task.wait(math.random(3, 8))
+        
         while botData.isAlive and botData.character and botData.character.Parent do
             local humanoid = botData.character:FindFirstChild("Humanoid")
             if not humanoid or humanoid.Health <= 0 then
@@ -217,11 +237,10 @@ function BotController:startBotAI(botData)
                 break
             end
             
-            -- Update bot behavior based on state
             BotController:updateBotBehavior(botData)
             
-            -- Wait based on reaction time
-            task.wait(botData.difficulty.reactionTime)
+            -- Wait based on reaction time (slower = more natural)
+            task.wait(botData.difficulty.reactionTime + math.random() * 0.5)
         end
     end)
 end
@@ -235,19 +254,31 @@ function BotController:updateBotBehavior(botData)
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not humanoid or not hrp then return end
     
-    -- Find nearest player or bot
+    -- Low health? Consider fleeing
+    if humanoid.Health < 30 and math.random() < 0.6 then
+        botData.state = "fleeing"
+        BotController:flee(botData)
+        return
+    end
+    
+    -- Find nearest target
     local nearestTarget, nearestDistance = BotController:findNearestTarget(botData)
     
-    -- Decide what to do based on state and situation
-    if nearestTarget and nearestDistance < 30 then
-        -- Close to a target
+    -- Only detect targets within detection range
+    local detectionRange = botData.difficulty.detectionRange
+    
+    if nearestTarget and nearestDistance < detectionRange then
+        -- Target in range - maybe hunt?
         if botData.state ~= "hunting" and math.random() < botData.difficulty.aggressiveness then
             botData.state = "hunting"
             botData.target = nearestTarget
+        elseif botData.state == "hunting" then
+            -- Continue hunting
+            botData.target = nearestTarget
         end
     else
-        -- No nearby targets, roam
-        if botData.state ~= "roaming" or tick() - botData.lastAction > 5 then
+        -- No target in range, roam
+        if botData.state ~= "roaming" or tick() - botData.lastAction > 8 then
             botData.state = "roaming"
             botData.lastAction = tick()
         end
@@ -261,14 +292,14 @@ function BotController:updateBotBehavior(botData)
     elseif botData.state == "fleeing" then
         BotController:flee(botData)
     else
-        -- Idle - occasionally start roaming
-        if math.random() < 0.3 then
+        -- Idle - sometimes start roaming
+        if math.random() < 0.2 then
             botData.state = "roaming"
         end
     end
 end
 
--- Find nearest target (player or other bot)
+-- Find nearest target
 function BotController:findNearestTarget(botData)
     local myHrp = botData.character:FindFirstChild("HumanoidRootPart")
     if not myHrp then return nil, math.huge end
@@ -331,16 +362,25 @@ function BotController:huntTarget(botData)
     
     local distance = (targetHrp.Position - myHrp.Position).Magnitude
     
+    -- Attack range is 5 studs
     if distance < 5 then
-        -- Close enough to attack
-        BotController:attackTarget(botData, target)
-    else
-        -- Move towards target
+        -- Check attack cooldown
+        local now = tick()
+        if now - botData.lastAttack >= botData.difficulty.attackCooldown then
+            BotController:attackTarget(botData, target)
+            botData.lastAttack = now
+        end
+    elseif distance < 50 then
+        -- Chase target (but not too fast)
         humanoid:MoveTo(targetHrp.Position)
+    else
+        -- Lost target, go back to roaming
+        botData.target = nil
+        botData.state = "roaming"
     end
 end
 
--- Attack a target
+-- Attack a target with visual feedback
 function BotController:attackTarget(botData, target)
     local targetHumanoid = target:FindFirstChild("Humanoid")
     if not targetHumanoid or targetHumanoid.Health <= 0 then
@@ -349,19 +389,26 @@ function BotController:attackTarget(botData, target)
         return
     end
     
+    -- Visual attack animation (swing weapon)
+    local rightArm = botData.character:FindFirstChild("Right Arm")
+    if rightArm then
+        local shoulder = rightArm:FindFirstChild("Right Shoulder") or botData.character.Torso:FindFirstChild("Right Shoulder")
+        if shoulder then
+            -- Quick swing animation
+            task.spawn(function()
+                local original = shoulder.C0
+                local swingCFrame = original * CFrame.Angles(math.rad(-90), 0, 0)
+                shoulder.C0 = swingCFrame
+                task.wait(0.3)
+                shoulder.C0 = original
+            end)
+        end
+    end
+    
     -- Check accuracy - roll to see if we hit
     if math.random() < botData.difficulty.accuracy then
-        local damage = math.random(8, 15)
+        local damage = math.random(5, 10) -- Reduced damage (was 8-15)
         targetHumanoid:TakeDamage(damage)
-        
-        -- Notify of damage (for kill feed, etc.)
-        local statsRemote = ReplicatedStorage:FindFirstChild("StatsRemoteEvent")
-        if statsRemote then
-            local targetPlayer = Players:GetPlayerFromCharacter(target)
-            if targetPlayer then
-                statsRemote:FireClient(targetPlayer, "STAT_UPDATE", "health", targetHumanoid.Health, targetHumanoid.Health + damage)
-            end
-        end
         
         -- Check if we killed the target
         if targetHumanoid.Health <= 0 then
@@ -387,12 +434,11 @@ function BotController:roamAround(botData)
     
     if not humanoid or not hrp then return end
     
-    -- Pick a random destination
-    local arenaSize = Config.ARENA_SIZE / 2
-    local destination = Vector3.new(
-        math.random(-arenaSize * 0.7, arenaSize * 0.7),
-        hrp.Position.Y,
-        math.random(-arenaSize * 0.7, arenaSize * 0.7)
+    -- Pick a nearby random destination (not too far)
+    local destination = hrp.Position + Vector3.new(
+        math.random(-50, 50),
+        0,
+        math.random(-50, 50)
     )
     
     humanoid:MoveTo(destination)
@@ -411,16 +457,25 @@ function BotController:flee(botData)
         local targetHrp = botData.target:FindFirstChild("HumanoidRootPart")
         if targetHrp then
             local fleeDirection = (hrp.Position - targetHrp.Position).Unit
-            local fleeDestination = hrp.Position + fleeDirection * 50
+            local fleeDestination = hrp.Position + fleeDirection * 80
             humanoid:MoveTo(fleeDestination)
+            humanoid.WalkSpeed = botData.difficulty.speed + 4 -- Sprint away
         end
+    else
+        -- Random flee if no specific target
+        local fleeDestination = hrp.Position + Vector3.new(math.random(-60, 60), 0, math.random(-60, 60))
+        humanoid:MoveTo(fleeDestination)
     end
     
     -- After fleeing, reset state
-    task.delay(3, function()
+    task.delay(5, function()
         if botData.isAlive then
             botData.state = "roaming"
             botData.target = nil
+            local hum = botData.character and botData.character:FindFirstChild("Humanoid")
+            if hum then
+                hum.WalkSpeed = botData.difficulty.speed
+            end
         end
     end)
 end
@@ -436,7 +491,7 @@ function BotController:eliminateBot(botData)
     
     -- Destroy character after delay
     if botData.character then
-        task.delay(3, function()
+        task.delay(5, function()
             if botData.character and botData.character.Parent then
                 botData.character:Destroy()
             end
@@ -479,22 +534,22 @@ function BotController:fillWithBots(targetCount)
     
     print("[BotController] Spawning " .. botsNeeded .. " bots to fill match...")
     
-    -- Mix of difficulties
+    -- Mostly EASY bots now for better gameplay
     for i = 1, botsNeeded do
         local difficulty
         local roll = math.random()
-        if roll < 0.3 then
-            difficulty = DIFFICULTY.EASY
-        elseif roll < 0.7 then
-            difficulty = DIFFICULTY.MEDIUM
+        if roll < 0.6 then
+            difficulty = DIFFICULTY.EASY  -- 60% easy
+        elseif roll < 0.9 then
+            difficulty = DIFFICULTY.MEDIUM -- 30% medium
         else
-            difficulty = DIFFICULTY.HARD
+            difficulty = DIFFICULTY.HARD  -- 10% hard
         end
         
         local district = ((i - 1) % 12) + 1
         BotController:createBot(district, difficulty)
         
-        task.wait(0.1) -- Stagger spawns
+        task.wait(0.2) -- Stagger spawns more
     end
     
     BotController.isActive = true
@@ -520,14 +575,6 @@ end
 -- Initialize
 function BotController.init()
     print("[BotController] Initializing...")
-    
-    -- Connect to match events
-    local lobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 10)
-    if lobbyRemote then
-        -- When match starts, fill with bots if needed
-        -- This is handled by LobbyService calling fillWithBots
-    end
-    
     print("[BotController] Initialized!")
 end
 

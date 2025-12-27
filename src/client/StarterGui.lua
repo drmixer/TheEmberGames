@@ -281,10 +281,10 @@ function StarterGui.init()
                         if timeLeft <= 10 then
                             local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
                             local tween = TweenService:Create(countdownNumber, tweenInfo, {
-                                TextColor3 = Color3.fromRGB(255, 50, 50), -- Red
-                                Font = Enum.Font.GothamBlack
+                                TextColor3 = Color3.fromRGB(255, 50, 50) -- Red
                             })
                             tween:Play()
+                            countdownNumber.Font = Enum.Font.GothamBlack -- Set directly, don't tween
                         end
                     end
                 end

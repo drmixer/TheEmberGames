@@ -8,7 +8,6 @@ print("The Ember Games server initializing...")
 task.wait(1)
 
 -- Require and run ServerMain which initializes all services
--- Note: script refers to the Server folder, so children are accessed directly
 local ServerMain = require(script.ServerMain)
 
 print("The Ember Games server started successfully!")
