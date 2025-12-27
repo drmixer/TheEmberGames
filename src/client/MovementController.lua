@@ -1,0 +1,148 @@
+-- LocalScript: MovementController.lua
+-- Handles Sprint, Crouch, and Dynamic FOV
+-- Adds tactical movement depth to the game
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local MovementController = {}
+MovementController.isSprinting = false
+MovementController.isCrouching = false
+MovementController.stamina = 100
+MovementController.lastSprintTime = 0
+
+-- Config
+local CONFIG = {
+    WALK_SPEED = 16,
+    SPRINT_SPEED = 25,
+    CROUCH_SPEED = 8,
+    
+    JUMP_POWER_NORMAL = 50,
+    JUMP_POWER_CROUCH = 0, -- No jump while checked
+    
+    FOV_NORMAL = 70,
+    FOV_SPRINT = 85,
+    
+    STAMINA_MAX = 100,
+    STAMINA_DRAIN = 15, -- Per second
+    STAMINA_REGEN = 10, -- Per second
+    STAMINA_COOLDOWN = 1.5 -- Seconds before regen starts
+}
+
+-- Animations (Ids or keyframe sequences would go here)
+-- We will just use Speed modification for MVP
+
+function MovementController:updateCameraFOV(dt)
+    local targetFOV = CONFIG.FOV_NORMAL
+    if MovementController.isSprinting then
+        targetFOV = CONFIG.FOV_SPRINT
+    end
+    
+    -- Smoothly interpolate FOV
+    Camera.FieldOfView = Camera.FieldOfView + (targetFOV - Camera.FieldOfView) * dt * 5
+end
+
+function MovementController:updateStamina(dt)
+    if MovementController.isSprinting and Player.Character and Player.Character.Humanoid.MoveDirection.Magnitude > 0 then
+        -- Drain
+        MovementController.stamina = math.max(0, MovementController.stamina - CONFIG.STAMINA_DRAIN * dt)
+        MovementController.lastSprintTime = tick()
+        
+        -- Stop sprinting if empty
+        if MovementController.stamina <= 0 then
+            MovementController:stopSprinting()
+        end
+    elseif tick() - MovementController.lastSprintTime > CONFIG.STAMINA_COOLDOWN then
+        -- Regen
+        MovementController.stamina = math.min(CONFIG.STAMINA_MAX, MovementController.stamina + CONFIG.STAMINA_REGEN * dt)
+    end
+end
+
+function MovementController:startSprinting()
+    if MovementController.isCrouching then MovementController:stopCrouching() end
+    if MovementController.stamina < 10 then return end -- Need minimum stamina
+    
+    MovementController.isSprinting = true
+    local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.WalkSpeed = CONFIG.SPRINT_SPEED
+    end
+end
+
+function MovementController:stopSprinting()
+    MovementController.isSprinting = false
+    local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.WalkSpeed = CONFIG.WALK_SPEED
+    end
+end
+
+function MovementController:startCrouching()
+    if MovementController.isSprinting then MovementController:stopSprinting() end
+    
+    MovementController.isCrouching = true
+    local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.WalkSpeed = CONFIG.CROUCH_SPEED
+        hum.JumpPower = CONFIG.JUMP_POWER_CROUCH
+        hum.HipHeight = 0 -- Default is 2, 0 lowers char but might clip legs. 
+        TweenService:Create(hum, TweenInfo.new(0.3), {HipHeight = -0.5}):Play()
+    end
+end
+
+function MovementController:stopCrouching()
+    MovementController.isCrouching = false
+    local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.WalkSpeed = CONFIG.WALK_SPEED
+        hum.JumpPower = CONFIG.JUMP_POWER_NORMAL
+        TweenService:Create(hum, TweenInfo.new(0.3), {HipHeight = 0}):Play()
+    end
+end
+
+local function onInputBegan(input, gpe)
+    if gpe then return end
+    
+    if input.KeyCode == Enum.KeyCode.LeftShift then
+        MovementController:startSprinting()
+    elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.LeftControl then
+        if MovementController.isCrouching then
+            MovementController:stopCrouching()
+        else
+            MovementController:startCrouching()
+        end
+    end
+end
+
+local function onInputEnded(input, gpe)
+    if input.KeyCode == Enum.KeyCode.LeftShift then
+        MovementController:stopSprinting()
+    end
+end
+
+function MovementController.init()
+    print("[MovementController] Initializing...")
+    UserInputService.InputBegan:Connect(onInputBegan)
+    UserInputService.InputEnded:Connect(onInputEnded)
+    
+    RunService.RenderStepped:Connect(function(dt)
+        MovementController:updateCameraFOV(dt)
+        MovementController:updateStamina(dt)
+    end)
+    
+    -- Reset on spawn
+    Player.CharacterAdded:Connect(function(char)
+        MovementController.isSprinting = false
+        MovementController.isCrouching = false
+        MovementController.stamina = CONFIG.STAMINA_MAX
+    end)
+end
+
+MovementController.init()
+return MovementController

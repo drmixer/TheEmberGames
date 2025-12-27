@@ -1,6 +1,7 @@
 -- ServerScript: CharacterSpawner.lua
 -- Handles character spawning for The Ember Games
 -- Manages player spawn positions, spawn platforms, and arena entry
+-- Updated to support Voxel Terrain via Raycasting
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,7 +10,6 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 local LobbyService = require(script.Parent.LobbyService)
-local PlayerStats = require(script.Parent.PlayerStats)
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Config = require(ReplicatedFirst.Config)
 
@@ -24,330 +24,187 @@ CharacterSpawner.platformsCreated = false
 -- Platform configuration
 local PLATFORM_CONFIG = {
     SIZE = Vector3.new(6, 1, 6),
-    HEIGHT = 3, -- Height above ground
+    HEIGHT = 4, -- Height above ground
     MATERIAL = Enum.Material.Metal,
     COLOR = Color3.fromRGB(80, 80, 80), -- Dark gray
     GLOW_COLOR = Color3.fromRGB(255, 140, 0), -- Orange glow during countdown
 }
 
--- RemoteEvents for spawn management
 local spawnerRemoteEvent = Instance.new("RemoteEvent")
 spawnerRemoteEvent.Name = "SpawnerRemoteEvent"
 spawnerRemoteEvent.Parent = ReplicatedStorage
 
--- Initialize spawn positions around the Cornucopia
 local function initializeSpawnPositions()
-    local arenaCenter = Vector3.new(0, 0, 0) -- Center of arena
-    local radius = 40 -- Distance from center to spawn platforms
+    local arenaCenter = Vector3.new(0, 0, 0)
+    local radius = 35 -- Distance from cornucopia
     
-    for i = 1, Config.PLAYER_CAP do
-        local angle = (i - 1) * (2 * math.pi / Config.PLAYER_CAP)
+    CharacterSpawner.spawnPositions = {}
+    
+    for i = 1, 24 do
+        local angle = (i - 1) * (2 * math.pi / 24)
         local x = arenaCenter.X + radius * math.cos(angle)
         local z = arenaCenter.Z + radius * math.sin(angle)
         
-        -- Y position is on top of the platform (ground level + platform height + half platform thickness)
-        local groundY = 0.5 -- Top of ground plane
-        local platformY = groundY + PLATFORM_CONFIG.HEIGHT + PLATFORM_CONFIG.SIZE.Y / 2
+        -- Raycast to find terrain height
+        local origin = Vector3.new(x, 200, z)
+        local result = workspace:Raycast(origin, Vector3.new(0, -300, 0))
+        local groundY = result and result.Position.Y or 8 -- Default to 8 if nil (flat cornucopia level)
         
-        -- Store spawn position (where player stands) - on top of platform
+        local platformY = groundY + PLATFORM_CONFIG.HEIGHT
+        
+        -- Position is center of the platform part
+        local platformPos = Vector3.new(x, platformY, z)
+        
         table.insert(CharacterSpawner.spawnPositions, {
-            position = Vector3.new(x, platformY + 3, z), -- 3 studs above platform
+            position = Vector3.new(x, platformY + 4, z), -- Player feet pos
             angle = angle,
-            platformPosition = Vector3.new(x, groundY + PLATFORM_CONFIG.HEIGHT, z)
+            platformPosition = platformPos
         })
     end
-    
-    print("[CharacterSpawner] Initialized " .. #CharacterSpawner.spawnPositions .. " spawn positions around Cornucopia")
+    print("[CharacterSpawner] Initialized spawn positions via Raycast")
 end
 
--- Create spawn platforms around Cornucopia
 function CharacterSpawner:createSpawnPlatforms()
-    if CharacterSpawner.platformsCreated then
-        return CharacterSpawner.spawnPlatforms
-    end
+    if CharacterSpawner.platformsCreated then return CharacterSpawner.spawnPlatforms end
     
-    -- Clear any existing platforms
-    for _, platform in ipairs(CharacterSpawner.spawnPlatforms) do
-        if platform and platform.Parent then
-            platform:Destroy()
-        end
-    end
+    -- Initialize positions first to ensure we have latest terrain data
+    initializeSpawnPositions()
+    
+    local folder = workspace:FindFirstChild("SpawnPlatforms") or Instance.new("Folder")
+    folder.Name = "SpawnPlatforms"
+    folder.Parent = workspace
+    folder:ClearAllChildren()
+    
     CharacterSpawner.spawnPlatforms = {}
     
-    -- Create a folder to hold platforms
-    local platformFolder = workspace:FindFirstChild("SpawnPlatforms")
-    if not platformFolder then
-        platformFolder = Instance.new("Folder")
-        platformFolder.Name = "SpawnPlatforms"
-        platformFolder.Parent = workspace
-    end
-    
-    for i, spawnData in ipairs(CharacterSpawner.spawnPositions) do
-        -- Create platform base
+    for i, data in ipairs(CharacterSpawner.spawnPositions) do
         local platform = Instance.new("Part")
-        platform.Name = "SpawnPlatform_" .. i
+        platform.Name = "Platform_" .. i
         platform.Size = PLATFORM_CONFIG.SIZE
-        platform.Position = spawnData.platformPosition
+        platform.Position = data.platformPosition
         platform.Anchored = true
         platform.CanCollide = true
         platform.Material = PLATFORM_CONFIG.MATERIAL
         platform.Color = PLATFORM_CONFIG.COLOR
-        platform.Parent = platformFolder
+        platform.Parent = folder
         
-        -- Add a pedestal/pillar under the platform
+        -- Pillar
+        local pillarHeight = PLATFORM_CONFIG.HEIGHT
         local pillar = Instance.new("Part")
-        pillar.Name = "Pillar"
-        pillar.Size = Vector3.new(2, PLATFORM_CONFIG.HEIGHT, 2)
-        pillar.Position = spawnData.platformPosition - Vector3.new(0, PLATFORM_CONFIG.HEIGHT / 2 + 0.5, 0)
+        pillar.Size = Vector3.new(2, pillarHeight, 2)
+        -- Position should be below platform. Platform Y is center.
+        -- Pillar bottom is at GroundY. Pillar Top is at (PlatformY - SIZE.Y/2).
+        -- Easier math: just place it halfway between platform and ground.
+        pillar.Position = data.platformPosition - Vector3.new(0, pillarHeight/2 + 0.5, 0)
         pillar.Anchored = true
         pillar.CanCollide = true
         pillar.Material = Enum.Material.Concrete
-        pillar.Color = Color3.fromRGB(60, 60, 60)
-        pillar.Parent = platform
+        pillar.Color = Color3.fromRGB(60,60,60)
+        pillar.Parent = folder
         
-        -- Add glowing ring on platform edge
-        local ring = Instance.new("Part")
-        ring.Name = "GlowRing"
-        ring.Size = Vector3.new(PLATFORM_CONFIG.SIZE.X, 0.2, PLATFORM_CONFIG.SIZE.Z)
-        ring.Position = spawnData.platformPosition + Vector3.new(0, 0.6, 0)
-        ring.Anchored = true
-        ring.CanCollide = false
-        ring.Material = Enum.Material.Neon
-        ring.Color = PLATFORM_CONFIG.COLOR
-        ring.Transparency = 0.5
-        ring.Parent = platform
-        
-        -- Add district number display
-        local billboardGui = Instance.new("BillboardGui")
-        billboardGui.Size = UDim2.new(4, 0, 2, 0)
-        billboardGui.StudsOffset = Vector3.new(0, 4, 0)
-        billboardGui.Adornee = platform
-        billboardGui.AlwaysOnTop = false
-        billboardGui.Parent = platform
-        
-        local districtLabel = Instance.new("TextLabel")
-        districtLabel.Size = UDim2.new(1, 0, 1, 0)
-        districtLabel.BackgroundTransparency = 1
-        districtLabel.TextScaled = true
-        districtLabel.Font = Enum.Font.GothamBold
-        districtLabel.Text = "DISTRICT " .. i
-        districtLabel.TextColor3 = Color3.new(1, 1, 1)
-        districtLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-        districtLabel.TextStrokeTransparency = 0.5
-        districtLabel.Parent = billboardGui
+        -- Glow
+        local glow = Instance.new("Part")
+        glow.Name = "GlowRing"
+        glow.Size = Vector3.new(6, 0.2, 6)
+        glow.Position = data.platformPosition + Vector3.new(0, 0.6, 0)
+        glow.Anchored = true
+        glow.CanCollide = false
+        glow.Material = Enum.Material.Neon
+        glow.Color = PLATFORM_CONFIG.COLOR
+        glow.Transparency = 0.5
+        glow.Parent = platform -- Attach to platform so it cleans up with it
         
         table.insert(CharacterSpawner.spawnPlatforms, platform)
     end
     
     CharacterSpawner.platformsCreated = true
-    print("[CharacterSpawner] Created " .. #CharacterSpawner.spawnPlatforms .. " spawn platforms")
-    
-    return CharacterSpawner.spawnPlatforms
 end
 
--- Activate platform glow during countdown
-function CharacterSpawner:activatePlatformGlow(activate)
-    for _, platform in ipairs(CharacterSpawner.spawnPlatforms) do
-        local ring = platform:FindFirstChild("GlowRing")
-        if ring then
-            if activate then
-                ring.Color = PLATFORM_CONFIG.GLOW_COLOR
-                ring.Transparency = 0.2
-            else
-                ring.Color = PLATFORM_CONFIG.COLOR
-                ring.Transparency = 0.5
-            end
+function CharacterSpawner:activatePlatformGlow(active)
+    for _, plat in ipairs(CharacterSpawner.spawnPlatforms) do
+        local glow = plat:FindFirstChild("GlowRing")
+        if glow then
+            glow.Color = active and PLATFORM_CONFIG.GLOW_COLOR or PLATFORM_CONFIG.COLOR
+            glow.Transparency = active and 0.2 or 0.5
         end
     end
 end
 
--- Lock player movement (during countdown)
 function CharacterSpawner:setPlayerMovementLock(player, locked)
     if not player.Character then return end
-    
-    local humanoid = player.Character:FindFirstChild("Humanoid")
-    if humanoid then
-        if locked then
-            humanoid.WalkSpeed = 0
-            humanoid.JumpPower = 0
-        else
-            humanoid.WalkSpeed = 16 -- Default speed
-            humanoid.JumpPower = 50 -- Default jump
-        end
+    local hum = player.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.WalkSpeed = locked and 0 or 16
+        hum.JumpPower = locked and 0 or 50
     end
-    
-    CharacterSpawner.playersOnPlatform[player] = locked
     spawnerRemoteEvent:FireClient(player, "MOVEMENT_LOCKED", locked)
 end
 
--- Spawn a player character on their designated platform
 function CharacterSpawner:spawnPlayer(player)
-    if CharacterSpawner.playersSpawned[player] then
-        return -- Already spawned
-    end
+    if CharacterSpawner.playersSpawned[player] then return end
     
-    -- Get spawn position for this player based on their district/lobby position
-    local playerIndex = 1
+    -- Simple round robin spawn assignment
+    local index = (#Players:GetPlayers() % 24) + 1
     if LobbyService.lobbyPlayers[player] then
-        playerIndex = LobbyService.lobbyPlayers[player].districtNumber or 1
+        index = LobbyService.lobbyPlayers[player].districtNumber or index
     end
     
-    -- Adjust to ensure within bounds
-    playerIndex = math.clamp(playerIndex, 1, #CharacterSpawner.spawnPositions)
-    local spawnData = CharacterSpawner.spawnPositions[playerIndex]
+    local data = CharacterSpawner.spawnPositions[index]
+    if not data then return end
     
-    if not spawnData then
-        print("[CharacterSpawner] No spawn position available for player: " .. player.Name)
-        return
-    end
+    player:LoadCharacter() -- Force Respawn
     
-    -- Store connection to clean up later
-    local characterConnection
-    characterConnection = player.CharacterAdded:Connect(function(character)
-        characterConnection:Disconnect()
-        
-        local humanoid = character:WaitForChild("Humanoid")
-        local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-        
-        -- Wait for character to fully load
+    -- Teleport when Character loads
+    local connection
+    connection = player.CharacterAdded:Connect(function(char)
+        connection:Disconnect()
+        local root = char:WaitForChild("HumanoidRootPart")
+        local hum = char:WaitForChild("Humanoid")
         task.wait(0.1)
+        root.CFrame = CFrame.new(data.position, Vector3.new(0, data.position.Y, 0)) -- Look at center
         
-        if humanoidRootPart and humanoidRootPart.Parent then
-            -- Position character on platform facing center
-            local lookAt = Vector3.new(0, spawnData.position.Y, 0) -- Look at arena center
-            local cf = CFrame.new(spawnData.position, lookAt)
-            humanoidRootPart.CFrame = cf
-            
-            -- Lock movement during countdown
-            if CharacterSpawner.countdownActive then
-                CharacterSpawner:setPlayerMovementLock(player, true)
-            end
-            
-            -- Initialize character with starting items
-            CharacterSpawner:giveStartingItems(player, character)
-            
-            -- Mark player as spawned
-            CharacterSpawner.playersSpawned[player] = true
-            
-            print("[CharacterSpawner] Spawned " .. player.Name .. " on platform " .. playerIndex)
-            
-            -- Notify client
-            spawnerRemoteEvent:FireClient(player, "SPAWNED_ON_PLATFORM", playerIndex, spawnData.position)
-        end
-    end)
-    
-    -- Actually spawn the character
-    player:LoadCharacter()
-end
-
--- Start the pre-match countdown
-function CharacterSpawner:startCountdown(duration)
-    CharacterSpawner.countdownActive = true
-    
-    -- Activate platform glow
-    CharacterSpawner:activatePlatformGlow(true)
-    
-    -- Lock all spawned players
-    for player, _ in pairs(CharacterSpawner.playersSpawned) do
-        if player and player.Parent and player.Character then
+        if CharacterSpawner.countdownActive then
             CharacterSpawner:setPlayerMovementLock(player, true)
         end
+        
+        -- Give Items
+        local inv = require(script.Parent.InventoryController)
+        inv:addItem(player, "Apples", 2)
+        inv:addItem(player, "Water", 1)
+        
+        CharacterSpawner.playersSpawned[player] = true
+        spawnerRemoteEvent:FireClient(player, "SPAWNED_ON_PLATFORM", index, data.position)
+    end)
+end
+
+function CharacterSpawner:startCountdown(duration)
+    CharacterSpawner.countdownActive = true
+    CharacterSpawner:activatePlatformGlow(true)
+    for plr, _ in pairs(CharacterSpawner.playersSpawned) do
+        CharacterSpawner:setPlayerMovementLock(plr, true)
     end
-    
-    print("[CharacterSpawner] Countdown started: " .. duration .. " seconds")
     spawnerRemoteEvent:FireAllClients("COUNTDOWN_STARTED", duration)
 end
 
--- End the countdown and release players
 function CharacterSpawner:endCountdown()
     CharacterSpawner.countdownActive = false
-    
-    -- Deactivate platform glow
     CharacterSpawner:activatePlatformGlow(false)
-    
-    -- Unlock all players
-    for player, _ in pairs(CharacterSpawner.playersSpawned) do
-        if player and player.Parent and player.Character then
-            CharacterSpawner:setPlayerMovementLock(player, false)
-        end
+    for plr, _ in pairs(CharacterSpawner.playersSpawned) do
+        CharacterSpawner:setPlayerMovementLock(plr, false)
     end
     
-    print("[CharacterSpawner] Countdown ended - players released!")
-    spawnerRemoteEvent:FireAllClients("COUNTDOWN_ENDED")
-    
-    -- Start match via MatchService
+    -- Start Match
     local MatchService = require(script.Parent.MatchService)
     MatchService:startMatch()
 end
 
--- Give player starting items (minimal to encourage resource gathering)
-function CharacterSpawner:giveStartingItems(player, character)
-    -- Try to get inventory controller
-    local success, InventoryController = pcall(function()
-        return require(script.Parent.InventoryController)
-    end)
-    
-    if success and InventoryController then
-        -- Give basic survival items
-        InventoryController:addItem(player, "Water Bottle", 1)
-        InventoryController:addItem(player, "Edible Berries", 3)
-        InventoryController:addItem(player, "Wood", 2)
-        InventoryController:addItem(player, "Stone", 1)
-        
-        print("[CharacterSpawner] Gave starting items to " .. player.Name)
-    end
-end
-
--- Reset spawner state for new match
-function CharacterSpawner:resetForNewMatch()
-    CharacterSpawner.playersSpawned = {}
-    CharacterSpawner.playersOnPlatform = {}
-    CharacterSpawner.countdownActive = false
-    
-    -- Recreate platforms
-    CharacterSpawner.platformsCreated = false
-    CharacterSpawner:createSpawnPlatforms()
-    
-    print("[CharacterSpawner] Reset for new match")
-end
-
--- Initialize CharacterSpawner
 function CharacterSpawner:init()
-    print("[CharacterSpawner] Initializing...")
+    print("[CharacterSpawner] Initializing")
     
-    -- Initialize spawn positions
-    initializeSpawnPositions()
-    
-    -- Create spawn platforms
-    CharacterSpawner:createSpawnPlatforms()
-    
-    -- Connect to player events
-    Players.PlayerAdded:Connect(function(player)
-        -- For MVP testing, spawn immediately when player joins
-        -- In real game, this would only happen at match start based on LobbyService
-        task.wait(2) -- Give other systems time to initialize
-        CharacterSpawner:spawnPlayer(player)
+    -- Delay init slightly to let terrain generate
+    task.delay(2, function()
+        CharacterSpawner:createSpawnPlatforms()
     end)
-    
-    -- Handle existing players
-    for _, player in pairs(Players:GetPlayers()) do
-        task.spawn(function()
-            task.wait(1)
-            CharacterSpawner:spawnPlayer(player)
-        end)
-    end
-    
-    -- Handle remote events from clients
-    spawnerRemoteEvent.OnServerEvent:Connect(function(player, action, ...)
-        if action == "REQUEST_SPAWN" then
-            CharacterSpawner:spawnPlayer(player)
-        elseif action == "PLAYER_ELIMINATED" then
-            -- In real game, player goes to spectator
-            -- For MVP testing, handled by MatchService
-        end
-    end)
-    
-    print("[CharacterSpawner] Initialized successfully")
 end
 
 return CharacterSpawner

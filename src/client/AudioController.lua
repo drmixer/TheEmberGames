@@ -46,6 +46,13 @@ local SOUND_IDS = {
     STORM_WARNING = "rbxassetid://9046676282", -- Storm rumble/warning
     STORM_DAMAGE = "rbxassetid://9046678108", -- Damage/pain sound
     ZONE_CLOSING = "rbxassetid://9046683891", -- Alert/siren warning
+    
+    -- UI Sounds (Premium Interaction)
+    UI_HOVER = "rbxassetid://6895079853", -- Subtle tick
+    UI_CLICK = "rbxassetid://6042053626", -- Satisfying click
+    UI_ERROR = "rbxassetid://6042052926", -- Error
+    UI_EQUIP = "rbxassetid://6035183870", -- Equip
+    UI_NOTIFICATION = "rbxassetid://6035184620", -- Notification
 }
 
 -- Create screen GUI for audio (sounds parented here)
@@ -164,6 +171,25 @@ end
 -- Handle pickup sound
 function AudioController:playPickupSound(soundId)
     playSound(soundId, 0.6, false, PlayerGui)
+end
+
+-- Play UI Sound
+function AudioController:playUISound(soundName)
+    local id = SOUND_IDS[soundName] or SOUND_IDS.UI_CLICK
+    playSound(id, 0.5, false, PlayerGui)
+end
+
+-- Auto-connect button for generic hover/click sounds
+function AudioController:connectButton(button)
+    if not button then return end
+    
+    button.MouseEnter:Connect(function()
+        AudioController:playUISound("UI_HOVER")
+    end)
+    
+    button.MouseButton1Click:Connect(function()
+        AudioController:playUISound("UI_CLICK")
+    end)
 end
 
 -- Handle warning sound
