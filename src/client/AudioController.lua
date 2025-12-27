@@ -217,13 +217,134 @@ function AudioController:stopWarningSound(warningType)
     end
 end
 
--- Play storm warning with increasing intensity
-function AudioController:playStormWarning(phase)
-    local volume = 0.3 + (phase * 0.1) -- Louder as storm progresses
-    playSound(SOUND_IDS.ZONE_CLOSING, math.min(volume, 0.8), false, PlayerGui)
+-- Storm Audio Logic
+AudioController.stormAudio = {
+    windSound = nil,
+    rumbleSound = nil,
+    active = false,
+    connection = nil,
+    currentPhase = 0,
+    center = Vector3.new(0, 0, 0),
+    radius = 1000,
+    warningSound = nil
+}
+
+function AudioController:startStormAudio(phase, radius, center)
+    local sa = AudioController.stormAudio
+    sa.currentPhase = phase
+    sa.radius = radius or 1000
+    sa.center = center or Vector3.new(0, 0, 0)
     
-    print("[AudioController] Storm warning - Phase " .. phase)
+    if sa.active then return end
+    sa.active = true
+    
+    -- Create looped ambient sounds
+    if not sa.windSound then
+        sa.windSound = Instance.new("Sound")
+        sa.windSound.Name = "StormWind"
+        sa.windSound.SoundId = "rbxassetid://9046676282" -- Howling wind
+        sa.windSound.Volume = 0
+        sa.windSound.Looped = true
+        sa.windSound.Parent = PlayerGui
+        sa.windSound:Play()
+    end
+    
+    if not sa.rumbleSound then
+        sa.rumbleSound = Instance.new("Sound")
+        sa.rumbleSound.Name = "StormRumble"
+        sa.rumbleSound.SoundId = "rbxassetid://9114243671" -- Deep rumble
+        sa.rumbleSound.Volume = 0
+        sa.rumbleSound.Looped = true
+        sa.rumbleSound.Pitch = 0.5
+        sa.rumbleSound.Parent = PlayerGui
+        sa.rumbleSound:Play()
+    end
+    
+    -- Play phase warning sound
+    local volume = 0.3 + (phase * 0.1)
+    sa.warningSound = playSound(SOUND_IDS.ZONE_CLOSING, math.min(volume, 0.8), false, PlayerGui)
+    
+    print("[AudioController] Storm audio started - Phase " .. phase)
+    
+    -- Connect heartbeat for dynamic proximity audio
+    if sa.connection then sa.connection:Disconnect() end
+    
+    sa.connection = RunService.Heartbeat:Connect(function()
+        if not sa.active or not Player.Character then return end
+        
+        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        -- Calculate distance to storm edge
+        local playerDist = (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - sa.center).Magnitude
+        local distToEdge = math.abs(sa.radius - playerDist)
+        local isInside = playerDist < sa.radius
+        
+        -- Audio logic:
+        -- 1. Inside safe zone: quiet, gets louder near edge
+        -- 2. Outside safe zone: LOUD, muffled/distorted
+        
+        local targetWindVol = 0
+        local targetRumbleVol = 0
+        local targetPitch = 1
+        
+        if isInside then
+            -- Safe, but hear it coming
+            if distToEdge < 200 then
+                -- Within 200 studs of edge, fade in
+                local proximity = 1 - (distToEdge / 200) -- 0 to 1
+                targetWindVol = 0.1 + (proximity * 0.4)
+                targetRumbleVol = proximity * 0.3
+            else
+                -- Deep inside safe zone
+                targetWindVol = 0.05 -- Faint background
+                targetRumbleVol = 0
+            end
+        else
+            -- IN THE STORM
+            targetWindVol = 0.8 + (math.random() * 0.2) -- 0.8-1.0 fluctuating
+            targetRumbleVol = 0.6
+            targetPitch = 0.8 -- Lower pitch feels oppressive
+            
+            -- Screen shake or other effects could trigger here too
+        end
+        
+        -- Smoothly interpolate volume
+        if sa.windSound then
+            sa.windSound.Volume = sa.windSound.Volume + (targetWindVol - sa.windSound.Volume) * 0.1
+            sa.windSound.Pitch = targetPitch
+        end
+        
+        if sa.rumbleSound then
+            sa.rumbleSound.Volume = sa.rumbleSound.Volume + (targetRumbleVol - sa.rumbleSound.Volume) * 0.1
+        end
+    end)
 end
+
+function AudioController:stopStormAudio()
+    local sa = AudioController.stormAudio
+    sa.active = false
+    
+    if sa.connection then 
+        sa.connection:Disconnect() 
+        sa.connection = nil
+    end
+    
+    if sa.windSound then
+        TweenService:Create(sa.windSound, TweenInfo.new(2), {Volume = 0}):Play()
+        task.delay(2, function() 
+            if sa.windSound then sa.windSound:Stop() end 
+        end)
+    end
+    
+    if sa.rumbleSound then
+        TweenService:Create(sa.rumbleSound, TweenInfo.new(2), {Volume = 0}):Play()
+        task.delay(2, function() 
+            if sa.rumbleSound then sa.rumbleSound:Stop() end 
+        end)
+    end
+end
+
 
 -- Check health and manage low health warning
 function AudioController:checkHealthWarning(health)
@@ -275,11 +396,34 @@ function AudioController.init()
                 
             elseif eventType == "STORM_WARNING" then
                 local phase = args[1]
-                AudioController:playStormWarning(phase)
+                local radius = args[2] -- Expecting radius now
+                local center = args[3] -- Expecting center now
+                -- Use new storm audio system if radius/center provided
+                if radius then
+                    AudioController:startStormAudio(phase, radius, center)
+                else
+                    AudioController:startStormAudio(phase, 1000, Vector3.new(0,0,0)) -- Fallback
+                end
+            elseif eventType == "MATCH_END" then
+                AudioController:stopStormAudio()
             end
         end)
     else
         warn("[AudioController] AudioRemoteEvent not found")
+    end
+    
+    -- Connect to EventsRemote for storm phases (backup/main source)
+    local EventsRemoteEvent = ReplicatedStorage:FindFirstChild("EventsRemoteEvent")
+    if EventsRemoteEvent then
+        EventsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
+            if eventType == "STORM_PHASE_ACTIVE" then
+                local phase = args[1]
+                local radius = args[2]
+                local center = args[3]
+                AudioController:startStormAudio(phase, radius, center)
+            end
+        end)
     end
     
     -- Connect to stats for health monitoring

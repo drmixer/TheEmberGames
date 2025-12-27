@@ -151,6 +151,8 @@ local function shakeCamera(intensity)
     end)
 end
 
+
+
 local function showHitMarker(isCritical)
     local gui = WeaponController.screenGui
     if not gui then return end
@@ -170,6 +172,46 @@ local function showHitMarker(isCritical)
         ImageTransparency = 1
     }):Play()
     Debris:AddItem(marker, 0.2)
+end
+
+-- Create a fake visual projectile for instant feedback
+local function createVisualProjectile(tool, startPos, direction, speed)
+    local projectile = Instance.new("Part")
+    projectile.Name = "VisualProjectile"
+    projectile.Size = Vector3.new(0.2, 0.2, 1.5)
+    projectile.Color = Color3.fromRGB(100, 70, 40)
+    projectile.Material = Enum.Material.Wood
+    projectile.CanCollide = false
+    projectile.Anchored = false -- Use body velocity
+    projectile.CFrame = CFrame.lookAt(startPos, startPos + direction)
+    projectile.Parent = workspace
+    
+    if tool:GetAttribute("WeaponId") == "Bow" then
+        local tip = Instance.new("Part")
+        tip.Size = Vector3.new(0.15, 0.3, 0.15)
+        tip.Color = Color3.fromRGB(80, 80, 80)
+        tip.CanCollide = false
+        tip.Massless = true
+        tip.Parent = projectile
+        local weld = Instance.new("Weld", tip)
+        weld.Part0 = projectile
+        weld.Part1 = tip
+        weld.C0 = CFrame.new(0, 0, -0.9)
+    end
+    
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity = direction.Unit * speed
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Parent = projectile
+    
+    -- Cleanup
+    Debris:AddItem(projectile, 3)
+    
+    -- Fade out logic to avoid seeing double when server projectile arrives
+    task.delay(0.1, function()
+        -- In a real production game, we'd hide the SERVER projectile locally
+        -- For now, we'll just let this one fade out quickly or handle hit visual
+    end)
 end
 
 -- ============ ANIMATIONS ============
@@ -212,10 +254,64 @@ local function performMeleeAttack()
     shakeCamera(0.5)
     playAttackAnimation("SWING_OVERHEAD")
     
-    -- Send
-    local dir = char.HumanoidRootPart.CFrame.LookVector
-    if WeaponSystemRemote then
-        WeaponSystemRemote:FireServer("MELEE_ATTACK", dir)
+    -- Client-Side Hit Detection (Responsive!)
+    local range = tool:GetAttribute("Range") or 5
+    local origin = char.HumanoidRootPart.Position
+    local dir = Camera.CFrame.LookVector * range
+    
+    -- Raycast parameters
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {char}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local hitResult = workspace:Raycast(origin, dir, rayParams)
+    local targetFound = nil
+    local hitPos = origin + dir
+    
+    if hitResult then
+        hitPos = hitResult.Position
+        local hitChar = hitResult.Instance.Parent
+        if hitChar:FindFirstChild("Humanoid") then
+            local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
+            if hitPlayer then
+                targetFound = hitPlayer
+            end
+        end
+    end
+    
+    -- Cone check fallback (Wide Swing)
+    if not targetFound then
+        for _, otherPlayer in pairs(Players:GetPlayers()) do
+            if otherPlayer ~= Player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local otherHrp = otherPlayer.Character.HumanoidRootPart
+                local vecTo = otherHrp.Position - origin
+                local dist = vecTo.Magnitude
+                if dist < range then
+                    local angle = math.acos(vecTo.Unit:Dot(Camera.CFrame.LookVector))
+                    if angle < math.rad(45) then -- 45 degree cone
+                        targetFound = otherPlayer
+                        hitPos = otherHrp.Position
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
+    if targetFound then
+        -- Predict hit locally (Instant Feedback)
+        -- We don't show damage numbers yet (server confirms amount), but we can show blood impact
+        local CombatFeedback = require(script.Parent:WaitForChild("CombatFeedback"))
+        CombatFeedback:showHitMarker(false) -- optimistic marker
+        
+        if WeaponSystemRemote then
+            WeaponSystemRemote:FireServer("MELEE_HIT", targetFound, hitPos)
+        end
+    else
+        -- Just Swing
+        if WeaponSystemRemote then
+            WeaponSystemRemote:FireServer("MELEE_SWING", Camera.CFrame.LookVector)
+        end
     end
 end
 
@@ -270,6 +366,12 @@ local function releaseCharge()
     shakeCamera(1.0 * factor) -- Bigger shake for fuller charge
     
     local dir = getAimDirection()
+    
+    -- Instant Visual Feedback
+    local speed = tool:GetAttribute("ProjectileSpeed") or 100
+    local origin = char.HumanoidRootPart.Position + Vector3.new(0, 2, 0) + dir * 2
+    createVisualProjectile(tool, origin, dir, speed * factor)
+    
     if WeaponSystemRemote then
         WeaponSystemRemote:FireServer("RANGED_ATTACK", dir, factor)
     end

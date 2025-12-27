@@ -95,29 +95,105 @@ local function generateColumn(x, z, biomeData)
     return height
 end
 
--- Decoration Helpers (Simplified from original)
-local function getDecorationFolder()
-    local folder = Workspace:FindFirstChild("ArenaDecorations") or Instance.new("Folder")
-    folder.Name = "ArenaDecorations"
-    folder.Parent = Workspace
-    return folder
-end
-
-local function spawnProp(name, cframe, size, color, material, meshFunc)
+-- Helper: Spawn harvestable resource node
+local function spawnResourceNode(resourceName, resourceData, position)
     local part = Instance.new("Part")
-    part.Name = name
-    part.Size = size
-    part.CFrame = cframe
+    part.Name = "ResourceNode_" .. resourceName
+    part.Size = Vector3.new(4, 4, 4) -- Default size
+    
+    -- Customize appearance based on resource
+    if resourceName:find("Wood") or resourceName:find("Tree") then
+        local height = math.random(10, 18)
+        part.Size = Vector3.new(2, height, 2)
+        part.Position = position + Vector3.new(0, height/2, 0)
+        part.Color = Color3.fromRGB(90, 60, 40)
+        part.Material = Enum.Material.Wood
+        
+        -- Add leaves for trees
+        local leaves = Instance.new("Part")
+        leaves.Name = "Leaves"
+        leaves.Size = Vector3.new(8, 6, 8)
+        leaves.Position = position + Vector3.new(0, height, 0)
+        leaves.Color = Color3.fromRGB(40, 90, 40)
+        leaves.Material = Enum.Material.Grass
+        leaves.Anchored = true
+        leaves.CanCollide = false
+        leaves.Parent = getDecorationFolder()
+        
+    elseif resourceName:find("Stone") or resourceName:find("Rock") or resourceName:find("Coal") then
+        part.Size = Vector3.new(math.random(4,6), math.random(3,5), math.random(4,6))
+        part.Position = position + Vector3.new(0, part.Size.Y/2, 0)
+        part.Material = Enum.Material.Slate
+        part.Shape = Enum.PartType.Ball
+        
+        if resourceName:find("Coal") then
+            part.Color = Color3.fromRGB(20, 20, 20)
+        elseif resourceName:find("Frozen") then
+            part.Color = Color3.fromRGB(200, 240, 255)
+            part.Material = Enum.Material.Ice
+        elseif resourceName:find("Volcanic") then
+            part.Color = Color3.fromRGB(40, 40, 40)
+            part.Material = Enum.Material.Basalt
+        else
+            part.Color = Color3.fromRGB(100, 100, 105)
+        end
+        
+    elseif resourceName:find("Berry") or resourceName:find("Herb") or resourceName:find("Flower") then
+        part.Size = Vector3.new(3, 3, 3)
+        part.Position = position + Vector3.new(0, 1.5, 0)
+        part.Shape = Enum.PartType.Ball
+        part.Material = Enum.Material.Grass
+        part.Color = Color3.fromRGB(80, 140, 60)
+        part.CanCollide = false -- Walk through bushes
+        
+    else
+        -- Generic pickup
+        part.Size = Vector3.new(2, 2, 2)
+        part.Position = position + Vector3.new(0, 1, 0)
+        part.Color = Color3.fromRGB(200, 200, 200)
+        part.Material = Enum.Material.Plastic
+    end
+    
     part.Anchored = true
-    part.CanCollide = false
-    part.Material = material
-    part.Color = color
     part.Parent = getDecorationFolder()
+    
+    -- Tag as harvestable
+    part:SetAttribute("IsResource", true)
+    part:SetAttribute("ResourceName", resourceName)
+    part:SetAttribute("Amount", math.random(1, 3))
+    
+    -- Add Prompt
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.ActionText = "Gather " .. (resourceData.displayName or resourceName)
+    prompt.ObjectText = resourceData.rarity .. " Material"
+    prompt.HoldDuration = resourceData.gatherTime or 1
+    prompt.MaxActivationDistance = 8
+    prompt.Parent = part
+    
     return part
 end
 
 function TerrainGenerator:spawnDecorations(biomeData)
-    local count = math.floor(biomeData.radius / 5) -- Density
+    -- Fix: Correctly require from ReplicatedStorage (assuming src/shared maps there)
+    local BiomeResources 
+    local success, module = pcall(function()
+        return require(game:GetService("ReplicatedStorage"):WaitForChild("BiomeResources")) 
+    end)
+    
+    if not success then
+        -- Fallback if mapped differently (e.g. inside a Shared folder)
+        success, module = pcall(function()
+             return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("BiomeResources"))
+        end)
+    end
+    
+    if not success then
+        warn("[TerrainGenerator] Failed to load BiomeResources!")
+        return
+    end
+    BiomeResources = module
+    
+    local count = math.floor(biomeData.radius / 8) -- Density (slightly lower for meaningful resources)
     local center = biomeData.center
     local radius = biomeData.radius
     
@@ -130,23 +206,25 @@ function TerrainGenerator:spawnDecorations(biomeData)
         
         -- Raycast to find terrain height
         local origin = Vector3.new(x, 200, z)
-        local result = Workspace:Raycast(origin, Vector3.new(0, -300, 0))
+        local direction = Vector3.new(0, -300, 0)
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        raycastParams.FilterDescendantsInstances = {getDecorationFolder()} -- Don't hit other decor
+        
+        local result = Workspace:Raycast(origin, direction, raycastParams)
         
         if result and result.Instance:IsA("Terrain") then
+            -- Check water depth (don't spawn underwater unless water resource)
+            if result.Position.Y < -2 then continue end 
+            
             local pos = result.Position
             local biome = biomeData.type
             
-            if biome == "forest" and math.random() > 0.5 then
-                -- Trunk
-                 spawnProp("TreeTrunk", CFrame.new(pos + Vector3.new(0,6,0)), Vector3.new(2,12,2), Color3.fromRGB(90,60,40), Enum.Material.Wood)
-                 -- Leaves
-                 spawnProp("TreeLeaves", CFrame.new(pos + Vector3.new(0,12,0)), Vector3.new(10,8,10), Color3.fromRGB(40,90,40), Enum.Material.Grass)
-            elseif biome == "meadow" and math.random() > 0.8 then
-                 spawnProp("Bush", CFrame.new(pos + Vector3.new(0,1,0)), Vector3.new(4,3,4), Color3.fromRGB(80,140,60), Enum.Material.Grass)
-            elseif biome == "mountain" and math.random() > 0.7 then
-                 spawnProp("Rock", CFrame.new(pos + Vector3.new(0,2,0)) * CFrame.Angles(math.random(), math.random(), math.random()), Vector3.new(6,6,6), Color3.fromRGB(100,100,105), Enum.Material.Slate)
-            elseif biome == "desert" and math.random() > 0.9 then
-                 spawnProp("Cactus", CFrame.new(pos + Vector3.new(0,4,0)), Vector3.new(2,8,2), Color3.fromRGB(60,120,60), Enum.Material.Plastic)
+            -- Decide what to spawn using BiomeResources
+            local resourceName, resourceData = BiomeResources:getRandomResourceForBiome(biome)
+            
+            if resourceName then
+                spawnResourceNode(resourceName, resourceData, pos)
             end
         end
     end

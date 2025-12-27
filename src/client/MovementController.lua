@@ -106,6 +106,61 @@ function MovementController:stopCrouching()
     end
 end
 
+-- ============ DODGE MECHANIC ============
+MovementController.lastDodgeTime = 0
+MovementController.DODGE_COOLDOWN = 1.5
+MovementController.DODGE_FORCE = 6000 -- Mass dependent, assume ~100 mass
+
+function MovementController:dodge()
+    local now = tick()
+    if now - MovementController.lastDodgeTime < MovementController.DODGE_COOLDOWN then return end
+    
+    local char = Player.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+    
+    -- Consume Stamina
+    if MovementController.stamina < 20 then return end
+    MovementController.stamina = MovementController.stamina - 20
+    MovementController.lastDodgeTime = now
+    
+    -- Direction
+    local dir = hum.MoveDirection
+    if dir.Magnitude == 0 then
+        dir = hrp.CFrame.LookVector * -1 -- Back hop if standing still
+    end
+    
+    -- Apply Impulse
+    -- Calculate mass for consistent force
+    local mass = 0
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then mass = mass + part:GetMass() end
+    end
+    
+    local force = dir * (mass * 40) -- 40 is a good multiplier for a dash
+    hrp:ApplyImpulse(force + Vector3.new(0, mass * 5, 0)) -- Slight hop
+    
+    -- Visuals
+    -- Play roll animation if we had one, for now, simple lower
+    if not MovementController.isCrouching then
+        TweenService:Create(hum, TweenInfo.new(0.2), {CameraOffset = Vector3.new(0, -1.5, 0)}):Play()
+        task.delay(0.2, function()
+             TweenService:Create(hum, TweenInfo.new(0.3), {CameraOffset = Vector3.new(0, 0, 0)}):Play()
+        end)
+    end
+    
+    -- Sound (Dash whoosh)
+    local s = Instance.new("Sound", hrp)
+    s.SoundId = "rbxassetid://131070501" -- Jump/Air sound
+    s.Volume = 0.5
+    s.Pitch = 1.2
+    s.PlayOnRemove = true
+    s:Destroy()
+end
+
 local function onInputBegan(input, gpe)
     if gpe then return end
     
@@ -117,6 +172,8 @@ local function onInputBegan(input, gpe)
         else
             MovementController:startCrouching()
         end
+    elseif input.KeyCode == Enum.KeyCode.LeftAlt then
+        MovementController:dodge()
     end
 end
 

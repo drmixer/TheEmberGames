@@ -125,6 +125,67 @@ local WEAPONS = {
             bladeMaterial = Enum.Material.Metal
         }
     },
+
+    -- BIOME WEAPONS (New)
+    ["IceSword"] = {
+        type = "melee",
+        displayName = "Glacial Blade",
+        damage = 32,
+        attackSpeed = 0.7, -- Fast
+        range = 5,
+        durability = 30,
+        rarity = "rare",
+        description = "A sword forged from permafrost. Chills enemies.",
+        statusEffect = "SLOW",
+        statusChance = 0.3,
+        statusDuration = 3,
+        model = {
+            handleSize = Vector3.new(0.25, 1.2, 0.25),
+            handleColor = Color3.fromRGB(50, 50, 80),
+            handleMaterial = Enum.Material.Wood,
+            bladeSize = Vector3.new(0.15, 3.5, 0.4),
+            bladeColor = Color3.fromRGB(180, 230, 255),
+            bladeMaterial = Enum.Material.Ice
+        }
+    },
+
+    ["BambooSpear"] = {
+        type = "melee",
+        displayName = "Bamboo Spear",
+        damage = 22,
+        attackSpeed = 0.5, -- Very fast
+        range = 7.5, -- Long reach
+        durability = 25,
+        rarity = "uncommon",
+        description = "A lightweight, long-reaching spear from the jungle.",
+        model = {
+            handleSize = Vector3.new(0.2, 7, 0.2), -- Long
+            handleColor = Color3.fromRGB(100, 180, 80),
+            handleMaterial = Enum.Material.Wood,
+            tipSize = Vector3.new(0.15, 0.8, 0.15),
+            tipColor = Color3.fromRGB(50, 120, 40)
+        }
+    },
+
+    ["ObsidianAxe"] = {
+        type = "melee",
+        displayName = "Volcanic Axe",
+        damage = 45, -- High damage
+        attackSpeed = 1.4, -- Slow
+        range = 5,
+        durability = 40,
+        rarity = "epic",
+        description = "Heavy axe forged from volcanic glass.",
+        model = {
+            handleSize = Vector3.new(0.35, 4, 0.35),
+            handleColor = Color3.fromRGB(40, 40, 40),
+            handleMaterial = Enum.Material.Rock,
+            bladeSize = Vector3.new(0.4, 2, 1.5),
+            bladeColor = Color3.fromRGB(20, 10, 10),
+            bladeMaterial = Enum.Material.Slate,
+            bladeOffset = Vector3.new(0.5, 1.8, 0)
+        }
+    },
     
     -- RANGED WEAPONS
     ["Slingshot"] = {
@@ -861,9 +922,63 @@ function WeaponSystem.init()
         local args = {...}
         
         if action == "MELEE_ATTACK" then
+            -- Deprecated: Use SWING and HIT
             local direction = args[1]
             if direction then
                 WeaponSystem:processMeleeAttack(player, direction)
+            end
+            
+        elseif action == "MELEE_SWING" then
+            local direction = args[1]
+            local character = player.Character
+            if character then
+                local tool = character:FindFirstChildOfClass("Tool")
+                if tool then
+                     -- Broadcast swing to others
+                     weaponSystemRemote:FireAllClients("WEAPON_SWING", player.UserId, tool:GetAttribute("WeaponId"))
+                     
+                     -- Update cooldown
+                     WeaponSystem.weaponCooldowns[player] = tick()
+                     WeaponSystem:reduceDurability(player, tool)
+                end
+            end
+            
+        elseif action == "MELEE_HIT" then
+            local targetPlayer = args[1]
+            local hitPos = args[2]
+            
+            if targetPlayer and hitPos then
+                local character = player.Character
+                if not character then return end
+                
+                local tool = character:FindFirstChildOfClass("Tool")
+                if not tool or tool:GetAttribute("Type") ~= "melee" then return end
+                
+                -- Server-Side Verification (Anti-Cheat/Lag Comp)
+                local attPos = character.HumanoidRootPart.Position
+                local targetChar = targetPlayer.Character
+                
+                if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+                    local targetPos = targetChar.HumanoidRootPart.Position
+                    
+                    -- 1. Distance Check (Range + Buffer for lag)
+                    local range = tool:GetAttribute("Range") or 5
+                    local maxDist = range + 5 -- Generous 5 stud buffer for latency
+                    local dist = (attPos - targetPos).Magnitude
+                    
+                    if dist <= maxDist then
+                        -- 2. Cooldown Check (sanity)
+                        -- Allow slightly faster than attack speed to prevent rejection of valid spam
+                        -- local lastAttack = WeaponSystem.weaponCooldowns[player] or 0
+                        -- if tick() - lastAttack > 0.1 then 
+                            
+                            -- Valid Hit!
+                            WeaponSystem:applyDamage(player, targetPlayer, tool, hitPos)
+                        -- end
+                    else
+                        warn(player.Name .. " hit rejected: Too far ("..math.floor(dist).."/"..range..")")
+                    end
+                end
             end
             
         elseif action == "RANGED_ATTACK" then

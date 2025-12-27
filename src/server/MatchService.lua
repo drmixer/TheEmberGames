@@ -155,7 +155,8 @@ function MatchService:eliminatePlayer(player, killer)
     matchRemoteEvent:FireClient(player, "ENTER_SPECTATOR_MODE", {
         placement = MatchService:getActivePlayerCount() + 1,
         survivalTime = survivalTime,
-        kills = playerStats.kills
+        kills = playerStats.kills,
+        killerName = killer and killer.Name or "Environment" -- Added killer name
     })
     
     -- Check for victory condition

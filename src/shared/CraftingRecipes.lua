@@ -100,6 +100,44 @@ CraftingRecipes.recipes = {
         craftTime = 4,
         description = "Balanced throwing knives. Fast and accurate."
     },
+
+    -- ============ BIOME WEAPONS ============
+
+    bamboo_spear = {
+        name = "Bamboo Spear",
+        category = "WEAPONS",
+        ingredients = {
+            { itemName = "BambooStalk", amount = 3 },
+            { itemName = "Vines", amount = 2 }
+        },
+        result = { itemName = "BambooSpear", amount = 1 },
+        craftTime = 4,
+        description = "A long reach spear made from jungle bamboo."
+    },
+
+    glacial_blade = {
+        name = "Glacial Blade",
+        category = "WEAPONS",
+        ingredients = {
+            { itemName = "FrozenStone", amount = 4 },
+            { itemName = "Wood", amount = 2 }
+        },
+        result = { itemName = "IceSword", amount = 1 },
+        craftTime = 6,
+        description = "A freezing sword made from permafrost."
+    },
+
+    volcanic_axe = {
+        name = "Volcanic Axe",
+        category = "WEAPONS",
+        ingredients = {
+            { itemName = "VolcanicRock", amount = 4 },
+            { itemName = "Wood", amount = 3 }
+        },
+        result = { itemName = "ObsidianAxe", amount = 1 },
+        craftTime = 8,
+        description = "A heavy axe of volcanic glass."
+    },
     
     -- ============ AMMO ============
     
