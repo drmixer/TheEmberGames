@@ -269,115 +269,100 @@ end
 
 local function performMeleeAttack()
     local char = Player.Character
-    if not char then return end
+    if not char then 
+        print("[WeaponController] No character!")
+        return 
+    end
+    
     local tool = char:FindFirstChildOfClass("Tool")
-    if not tool or tool:GetAttribute("Type") ~= "melee" then return end
+    if not tool then
+        print("[WeaponController] No tool equipped!")
+        return
+    end
+    
+    if tool:GetAttribute("Type") ~= "melee" then
+        print("[WeaponController] Tool is not melee type: " .. tostring(tool:GetAttribute("Type")))
+        return
+    end
     
     local now = tick()
-    if now - WeaponController.attackCooldown < (tool:GetAttribute("AttackSpeed") or 0.5) then return end
+    local attackSpeed = tool:GetAttribute("AttackSpeed") or 0.5
+    if now - WeaponController.attackCooldown < attackSpeed then 
+        return -- Still on cooldown, silent
+    end
     WeaponController.attackCooldown = now
+    
+    print("[WeaponController] ATTACKING with " .. tool.Name)
     
     playSound(SOUND_IDS.SWING_WHOOSH, 0.8, math.random(90,110)/100)
     shakeCamera(0.5)
     
-    -- Simple weapon swing animation using the tool handle
-    local handle = tool:FindFirstChild("Handle")
-    if handle then
-        task.spawn(function()
-            -- Create a quick rotation effect on the tool
-            local originalCFrame = handle.CFrame
-            local swingOffset = CFrame.Angles(math.rad(-60), 0, math.rad(20))
-            
-            -- Quick swing down (0.1s)
-            local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-            local swingTween = TweenService:Create(handle, tweenInfo, {
-                CFrame = handle.CFrame * swingOffset
-            })
-            swingTween:Play()
-            swingTween.Completed:Wait()
-            
-            -- Return to original (0.2s)
-            local returnTween = TweenService:Create(handle, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-                CFrame = originalCFrame
-            })
-            returnTween:Play()
-        end)
-    end
-    
-    -- Try loading animation (may fail)
-    playAttackAnimation("SWING_OVERHEAD")
-    
-    -- Client-Side Hit Detection (Responsive!)
-    local range = tool:GetAttribute("Range") or 5
-    local origin = char.HumanoidRootPart.Position
-    local dir = Camera.CFrame.LookVector * range
-    
-    -- Raycast parameters
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {char}
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    
-    local hitResult = workspace:Raycast(origin, dir, rayParams)
-    local targetFound = nil
-    local hitPos = origin + dir
-    
-    if hitResult then
-        hitPos = hitResult.Position
-        local hitChar = hitResult.Instance.Parent
-        if hitChar:FindFirstChild("Humanoid") then
-            local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
-            if hitPlayer then
-                targetFound = hitPlayer
-            end
-        end
-    end
-    
-    -- Cone check fallback (Wide Swing) - Check BOTH players AND bots
-    if not targetFound then
-        -- Check players
-        for _, otherPlayer in pairs(Players:GetPlayers()) do
-            if otherPlayer ~= Player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local otherHrp = otherPlayer.Character.HumanoidRootPart
-                local vecTo = otherHrp.Position - origin
-                local dist = vecTo.Magnitude
-                if dist < range then
-                    local angle = math.acos(math.clamp(vecTo.Unit:Dot(Camera.CFrame.LookVector), -1, 1))
-                    if angle < math.rad(60) then -- 60 degree cone
-                        targetFound = otherPlayer
-                        hitPos = otherHrp.Position
-                        break
-                    end
-                end
-            end
-        end
+    -- Weapon swing animation using Tool Grip (actually works!)
+    task.spawn(function()
+        local originalGrip = tool.Grip
         
-        -- Check bots (models with IsBot tag)
-        if not targetFound then
-            for _, model in pairs(workspace:GetChildren()) do
-                if model:FindFirstChild("IsBot") and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
-                    local hum = model.Humanoid
-                    if hum.Health > 0 then
-                        local botHrp = model.HumanoidRootPart
-                        local vecTo = botHrp.Position - origin
-                        local dist = vecTo.Magnitude
-                        if dist < range then
-                            local angle = math.acos(math.clamp(vecTo.Unit:Dot(Camera.CFrame.LookVector), -1, 1))
-                            if angle < math.rad(60) then
-                                targetFound = model -- Bot model, not player
-                                hitPos = botHrp.Position
-                                break
-                            end
-                        end
-                    end
+        -- Swing forward/down
+        local swingGrip = originalGrip * CFrame.Angles(math.rad(-70), 0, math.rad(15))
+        tool.Grip = swingGrip
+        
+        task.wait(0.08)
+        
+        -- Swing through
+        local throughGrip = originalGrip * CFrame.Angles(math.rad(20), 0, math.rad(-10))
+        tool.Grip = throughGrip
+        
+        task.wait(0.1)
+        
+        -- Return to original
+        tool.Grip = originalGrip
+    end)
+    
+    -- Skip broken animation (try it but don't rely on it)
+    pcall(function()
+        playAttackAnimation("SWING_OVERHEAD")
+    end)
+    
+    -- Client-Side Hit Detection - SIMPLE SPHERE CHECK
+    local range = tool:GetAttribute("Range") or 6
+    local origin = char.HumanoidRootPart.Position
+    local targetFound = nil
+    local hitPos = origin
+    local closestDist = range + 1
+    
+    -- Check ALL models in workspace that could be targets
+    for _, model in pairs(workspace:GetDescendants()) do
+        if model:IsA("Model") and model ~= char then
+            local humanoid = model:FindFirstChildOfClass("Humanoid")
+            local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
+            
+            if humanoid and hrp and humanoid.Health > 0 then
+                local dist = (hrp.Position - origin).Magnitude
+                
+                -- Simple distance check - hit closest target within range
+                if dist <= range and dist < closestDist then
+                    closestDist = dist
+                    targetFound = model
+                    hitPos = hrp.Position
                 end
             end
         end
+    end
+    
+    -- Debug: show what we found
+    if targetFound then
+        print("[WeaponController] Found target: " .. targetFound.Name .. " at distance " .. string.format("%.1f", closestDist))
+    else
+        print("[WeaponController] No target in range " .. range .. " studs")
     end
     
     if targetFound then
         -- Show hit feedback
-        local CombatFeedback = require(script.Parent:WaitForChild("CombatFeedback"))
-        CombatFeedback:showHitMarker(false) -- optimistic marker
+        local success, CombatFeedback = pcall(function()
+            return require(script.Parent:WaitForChild("CombatFeedback", 1))
+        end)
+        if success and CombatFeedback then
+            CombatFeedback:showHitMarker(false)
+        end
         
         if WeaponSystemRemote then
             WeaponSystemRemote:FireServer("MELEE_HIT", targetFound, hitPos)

@@ -58,8 +58,8 @@ local function giveTestWeapons(player)
         return
     end
     
-    -- Give weapon (goes to Backpack)
-    local weapon = WeaponSystem:giveWeapon(player, "WoodenStick")
+    -- Give weapon (goes to Backpack) - SharpStick has a pointed tip!
+    local weapon = WeaponSystem:giveWeapon(player, "SharpStick")
     
     if weapon then
         task.wait(0.3) -- Wait for replication
@@ -69,18 +69,27 @@ local function giveTestWeapons(player)
         local toolToEquip = nil
         
         if backpack then
-            toolToEquip = backpack:FindFirstChild("WoodenStick")
+            toolToEquip = backpack:FindFirstChild("Sharp Stick") -- Display name
+            if not toolToEquip then
+                -- Try by Tool class
+                for _, child in pairs(backpack:GetChildren()) do
+                    if child:IsA("Tool") then
+                        toolToEquip = child
+                        break
+                    end
+                end
+            end
         end
         
         if toolToEquip then
             humanoid:EquipTool(toolToEquip)
-            print("[TestSetup] Equipped WoodenStick to " .. player.Name)
+            print("[TestSetup] Equipped " .. toolToEquip.Name .. " to " .. player.Name)
             print("[TestSetup] LEFT CLICK to attack!")
         else
             -- Try direct equip if still available
             if weapon.Parent then
                 humanoid:EquipTool(weapon)
-                print("[TestSetup] Direct equipped WoodenStick to " .. player.Name)
+                print("[TestSetup] Direct equipped weapon to " .. player.Name)
             else
                 print("[TestSetup] ERROR: Weapon not found in backpack!")
             end

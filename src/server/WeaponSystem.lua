@@ -34,7 +34,7 @@ local WEAPONS = {
         rarity = "common",
         description = "A basic wooden stick. Fast but weak.",
         model = {
-            handleSize = Vector3.new(0.5, 4.5, 0.5), -- Made thicker and longer for visibility
+            handleSize = Vector3.new(0.3, 3.5, 0.3), -- Thin stick
             handleColor = Color3.fromRGB(139, 90, 43),
             handleMaterial = Enum.Material.Wood,
             bladeSize = nil,
@@ -55,11 +55,11 @@ local WEAPONS = {
         statusChance = 0.10,
         statusDuration = 5,
         model = {
-            handleSize = Vector3.new(0.25, 5, 0.25),
+            handleSize = Vector3.new(0.4, 5, 0.4), -- Thicker for visibility
             handleColor = Color3.fromRGB(120, 80, 40),
             handleMaterial = Enum.Material.Wood,
-            tipSize = Vector3.new(0.15, 0.5, 0.15),
-            tipColor = Color3.fromRGB(100, 70, 30)
+            tipSize = Vector3.new(0.3, 1, 0.3), -- Bigger tip
+            tipColor = Color3.fromRGB(100, 100, 110) -- Metal gray
         }
     },
     
@@ -333,22 +333,28 @@ local function createMeleeWeaponModel(weaponId, weaponDef)
         weld.Parent = blade
     end
     
-    -- Create tip if exists (for spears)
+    -- Create tip if exists (for spears) - make it look pointed
     if weaponDef.model.tipSize then
         local tip = Instance.new("Part")
         tip.Name = "Tip"
-        tip.Size = weaponDef.model.tipSize
-        tip.Color = weaponDef.model.tipColor or Color3.fromRGB(100, 70, 30)
-        tip.Material = Enum.Material.Wood
+        tip.Size = Vector3.new(0.4, 1.5, 0.4) -- Bigger visible tip
+        tip.Color = Color3.fromRGB(120, 120, 130) -- Metal gray
+        tip.Material = Enum.Material.Metal
         tip.CanCollide = false
         tip.Massless = true
-        tip.Shape = Enum.PartType.Cylinder
         tip.Parent = weapon
+        
+        -- Use wedge mesh for pointed look like a spear head
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.Wedge
+        mesh.Scale = Vector3.new(1, 1, 1)
+        mesh.Parent = tip
         
         local weld = Instance.new("Weld")
         weld.Part0 = handle
         weld.Part1 = tip
-        weld.C0 = CFrame.new(0, handle.Size.Y / 2, 0) * CFrame.Angles(0, 0, math.rad(90))
+        -- Position at top of handle, rotated to point up
+        weld.C0 = CFrame.new(0, handle.Size.Y / 2 + 0.6, 0) * CFrame.Angles(math.rad(-90), 0, 0)
         weld.Parent = tip
     end
     
