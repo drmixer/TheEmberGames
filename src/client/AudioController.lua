@@ -56,6 +56,24 @@ local SOUND_IDS = {
     UI_NOTIFICATION = "rbxassetid://6035184620", -- Notification
 }
 
+-- Material Sounds (Footsteps & Impacts)
+local MATERIAL_SOUNDS = {
+    [Enum.Material.Grass] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://3041190784"}, -- Grass/Dirt
+    [Enum.Material.LeafyGrass] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://3041190784"},
+    [Enum.Material.Wood] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"}, -- Wood
+    [Enum.Material.WoodPlanks] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"},
+    [Enum.Material.Cobblestone] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"}, -- Fallback to Wood/Generic
+    [Enum.Material.Concrete] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"},
+    [Enum.Material.Slate] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"},
+    [Enum.Material.Metal] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"}, -- Fallback to Wood/Generic
+}
+-- Fallback
+local DEFAULT_MATERIAL_SOUND = {Step = "rbxassetid://160432334", Hit = "rbxassetid://3041190784"}
+
+-- Footstep State
+AudioController.lastStepTime = 0
+AudioController.stepInterval = 0.45
+
 -- Create screen GUI for audio (sounds parented here)
 local function createAudioGui()
     local screenGui = Instance.new("ScreenGui")
@@ -346,6 +364,45 @@ function AudioController:stopStormAudio()
     end
 end
 
+-- Start Footstep Loop
+function AudioController:startFootsteps()
+    RunService.RenderStepped:Connect(function()
+        local char = Player.Character
+        if not char then return end
+        
+        local humanoid = char:FindFirstChild("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        
+        if not humanoid or not hrp then return end
+        
+        -- Check if moving on ground
+        if humanoid.MoveDirection.Magnitude > 0.1 and humanoid.FloorMaterial ~= Enum.Material.Air then
+            -- Calculate interval based on speed (faster speed = smaller interval)
+            local speed = hrp.Velocity.Magnitude
+            local interval = 4.5 / math.max(speed, 0.1) -- Inverse relationship
+            interval = math.clamp(interval, 0.25, 0.6)
+            
+            if tick() - AudioController.lastStepTime > interval then
+                AudioController.lastStepTime = tick()
+                
+                -- Get material sound
+                local mat = humanoid.FloorMaterial
+                local soundData = MATERIAL_SOUNDS[mat] or DEFAULT_MATERIAL_SOUND
+                
+                -- Play step with slight pitch variation
+                local sound = playSound(soundData.Step, 0.3, false, hrp)
+                sound.Pitch = 0.9 + (math.random() * 0.2)
+            end
+        end
+    end)
+end
+
+-- Play Material Hit (Impact)
+function AudioController:playMaterialHit(position, material)
+    local soundData = MATERIAL_SOUNDS[material] or DEFAULT_MATERIAL_SOUND
+    playSoundAtPosition(soundData.Hit, position, 0.8)
+end
+
 
 -- Check health and manage low health warning
 function AudioController:checkHealthWarning(health)
@@ -370,6 +427,9 @@ function AudioController.init()
     print("[AudioController] Initializing...")
     
     createAudioGui()
+    
+    -- Start Footsteps
+    AudioController:startFootsteps()
     
     -- Connect to audio remote events asynchronously
     task.spawn(function()

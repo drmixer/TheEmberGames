@@ -426,6 +426,59 @@ local function startCharging()
         WeaponController.chargeIndicator.Fill.Size = UDim2.new(0,0,1,0)
     end
     
+    -- Client-side Ammo Check (Generic for all ranged weapons with AmmoType)
+    local ammoType = tool:GetAttribute("AmmoType")
+    if ammoType then
+        -- Correctly locate the InventoryGui module (Sibling of this script)
+        local InventoryGuiModule = script.Parent:WaitForChild("InventoryGui", 5)
+        
+        if InventoryGuiModule then
+            local success, InvGui = pcall(function() return require(InventoryGuiModule) end)
+            if success and InvGui then
+                -- Check for ammo
+                local hasAmmo = false
+                local ammoName = ammoType
+                print("[WeaponController] Checking ammo: " .. tostring(ammoName) .. " for " .. tool.Name)
+                
+                if InvGui.playerInventory then
+                    for _, item in pairs(InvGui.playerInventory.slots) do
+                        -- InventoryGui uses lowercase 'name' and 'amount'
+                        if item.name == ammoName and item.amount > 0 then
+                            hasAmmo = true
+                            print("[WeaponController] Found ammo: " .. tostring(item.amount))
+                            break
+                        end
+                    end
+                else
+                    warn("[WeaponController] PlayerInventory is nil!")
+                end
+                
+                if not hasAmmo then
+                    print("[WeaponController] No ammo found!") 
+                    -- Play empty click sound
+                    local sound = Instance.new("Sound")
+                    sound.SoundId = "rbxassetid://131070686" -- Click sound
+                    sound.Volume = 0.5
+                    sound.Parent = char.Head
+                    sound.PlayOnRemove = true
+                    sound:Destroy()
+                    
+                    -- Cancel charge
+                    WeaponController.isCharging = false
+                    WeaponController.actionState = "Idle"
+                    if WeaponController.chargeIndicator then
+                        WeaponController.chargeIndicator.Visible = false
+                    end
+                    return
+                end
+            else
+                warn("[WeaponController] Failed to require InventoryGui")
+            end
+        else
+            warn("[WeaponController] Condition check: InventoryGui module not found")
+        end
+    end
+
     playSound(SOUND_IDS.BOW_DRAW, 0.6)
     
     -- Shrink Crosshair for focus

@@ -243,6 +243,8 @@ function MatchHUD.init()
                 MatchHUD:updateTributesRemaining(data.remaining)
             elseif eventType == "ZONE_UPDATE" then
                 MatchHUD:updateZoneTimer(data.timeRemaining, data.isClosing)
+            elseif eventType == "RETURN_TO_LOBBY" then
+                MatchHUD:hide()
             end
         end)
     end

@@ -134,45 +134,7 @@ local function createBotCharacter(botData)
     rightLeg.CanCollide = false
     rightLeg.Parent = character
     
-    -- Add Tactical Vest (Procedural)
-    local vest = Instance.new("Part")
-    vest.Name = "Vest"
-    vest.Size = Vector3.new(2.1, 1.2, 1.1) -- Chest protection
-    vest.Color = Color3.fromRGB(50, 60, 50) -- Dark Olive
-    vest.Material = Enum.Material.Fabric
-    vest.CanCollide = false
-    vest.Parent = character
-    
-    local vestWeld = Instance.new("Weld")
-    vestWeld.Part0 = torso
-    vestWeld.Part1 = vest
-    vestWeld.C0 = CFrame.new(0, 0.4, 0) -- Upper chest
-    vestWeld.Parent = vest
-    
-    -- Add Knee Pads
-    local padColor = Color3.fromRGB(20, 20, 20)
-    
-    local leftPad = Instance.new("Part")
-    leftPad.Size = Vector3.new(1.1, 0.5, 1.1)
-    leftPad.Color = padColor
-    leftPad.CanCollide = false
-    leftPad.Parent = character
-    local lpWeld = Instance.new("Weld")
-    lpWeld.Part0 = leftLeg
-    lpWeld.Part1 = leftPad
-    lpWeld.C0 = CFrame.new(0, -0.2, 0) -- Knee height
-    lpWeld.Parent = leftPad
-    
-    local rightPad = Instance.new("Part")
-    rightPad.Size = Vector3.new(1.1, 0.5, 1.1)
-    rightPad.Color = padColor
-    rightPad.CanCollide = false
-    rightPad.Parent = character
-    local rpWeld = Instance.new("Weld")
-    rpWeld.Part0 = rightLeg
-    rpWeld.Part1 = rightPad
-    rpWeld.C0 = CFrame.new(0, -0.2, 0)
-    rpWeld.Parent = rightPad
+    -- Accessories (Vest/Knee Pads) removed in favor of DistrictCostumes assets
     
     -- Simple weapon visual
     local weapon = Instance.new("Part")
@@ -293,6 +255,12 @@ function BotController:createBot(district, difficulty)
     -- Tag bot for CharacterSpawner to find
     character:SetAttribute("PlatformIndex", platformIndex)
     
+    -- Apply District Costume IMMEDIATELY (Before parenting to workspace if possible, or right after)
+    local DistrictCostumes = require(script.Parent.DistrictCostumes)
+    if DistrictCostumes then
+        DistrictCostumes:applyDistrictCostume({Character = character, Name = botName}, botData.district)
+    end
+    
     character.Parent = workspace
     
     BotController.bots[botId] = botData
@@ -330,9 +298,28 @@ function BotController:updateBotBehavior(botData)
     local character = botData.character
     if not character then return end
     
-    local humanoid = character:FindFirstChild("Humanoid")
-    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = botData.character:FindFirstChild("Humanoid")
+    local hrp = botData.character:FindFirstChild("HumanoidRootPart")
     if not humanoid or not hrp then return end
+    
+    -- Handle Stun
+    if botData.state == "stunned" then
+        humanoid.WalkSpeed = 0
+        if tick() - botData.lastAction > 0.8 then -- 0.8s stun duration
+            botData.state = "roaming"
+            humanoid.WalkSpeed = botData.difficulty.speed
+        end
+        return
+    end
+    
+    -- Handle Windup (Telegraphed Attack)
+    if botData.state == "windup" then
+        humanoid.WalkSpeed = 2 -- Slow down during windup
+        if tick() - botData.lastAction > 0.5 then -- 0.5s windup
+             BotController:executeAttack(botData)
+        end
+        return
+    end
     
     -- Low health? Consider fleeing
     if humanoid.Health < 30 and math.random() < 0.6 then
@@ -386,6 +373,8 @@ function BotController:unfreezeBots()
         if bot.character then
             local hrp = bot.character:FindFirstChild("HumanoidRootPart")
             if hrp then hrp.Anchored = false end
+            
+            -- Costume already applied at creation
             
             -- Also set lastAction to now so they don't instant-react
             bot.lastAction = tick()
@@ -456,14 +445,24 @@ function BotController:huntTarget(botData)
     
     local distance = (targetHrp.Position - myHrp.Position).Magnitude
     
-    -- Attack range is 5 studs
-    if distance < 5 then
+    -- Attack range is ~6 studs
+    if distance < 6 then
         -- Check attack cooldown
         local now = tick()
         if now - botData.lastAttack >= botData.difficulty.attackCooldown then
-            BotController:attackTarget(botData, target)
-            botData.lastAttack = now
-        end
+            -- TELEGRAPH ATTACK (Windup)
+            botData.state = "windup"
+            botData.lastAction = now
+            
+                -- Visual Indicator (Red Flash REMOVED based on feedback)
+                -- local head = botData.character:FindFirstChild("Head")
+                -- if head then
+                --     local highlight = Instance.new("Highlight")
+                --     ...
+                -- end
+                
+                -- Play windup sound? (Generic woosh)
+            end
     elseif distance < 50 then
         -- Chase target (but not too fast)
         humanoid:MoveTo(targetHrp.Position)
@@ -474,14 +473,15 @@ function BotController:huntTarget(botData)
     end
 end
 
--- Attack a target with visual feedback
-function BotController:attackTarget(botData, target)
-    local targetHumanoid = target:FindFirstChild("Humanoid")
-    if not targetHumanoid or targetHumanoid.Health <= 0 then
-        botData.target = nil
+-- Execute the actual attack after windup
+function BotController:executeAttack(botData)
+    if not botData.target then 
         botData.state = "roaming"
-        return
+        return 
     end
+    
+    botData.state = "hunting" -- Return to hunting state
+    botData.lastAttack = tick()
     
     -- Visual attack animation (swing weapon)
     local rightArm = botData.character:FindFirstChild("Right Arm")
@@ -491,33 +491,70 @@ function BotController:attackTarget(botData, target)
             -- Quick swing animation
             task.spawn(function()
                 local original = shoulder.C0
-                local swingCFrame = original * CFrame.Angles(math.rad(-90), 0, 0)
-                shoulder.C0 = swingCFrame
-                task.wait(0.3)
-                shoulder.C0 = original
+                local swingCFrame = original * CFrame.Angles(math.rad(-110), 0, 0)
+                
+                -- Tween for smoothness
+                local t1 = TweenService:Create(shoulder, TweenInfo.new(0.1), {C0 = swingCFrame})
+                t1:Play()
+                t1.Completed:Wait()
+                
+                local t2 = TweenService:Create(shoulder, TweenInfo.new(0.2), {C0 = original})
+                t2:Play()
             end)
         end
     end
+
+    -- Check hitbox (Sphere check)
+    local myHrp = botData.character:FindFirstChild("HumanoidRootPart")
+    local targetHrp = botData.target:FindFirstChild("HumanoidRootPart")
     
-    -- Check accuracy - roll to see if we hit
-    if math.random() < botData.difficulty.accuracy then
-        local damage = math.random(5, 10) -- Reduced damage (was 8-15)
-        targetHumanoid:TakeDamage(damage)
+    if myHrp and targetHrp then
+        local dist = (myHrp.Position - targetHrp.Position).Magnitude
         
-        -- Check if we killed the target
-        if targetHumanoid.Health <= 0 then
-            print("[BotController] " .. botData.name .. " eliminated " .. target.Name)
-            botData.target = nil
-            botData.state = "roaming"
-            
-            -- If target was a bot, mark it as eliminated
-            for id, otherBot in pairs(BotController.bots) do
-                if otherBot.character == target then
-                    BotController:eliminateBot(otherBot)
-                    break
-                end
-            end
+        -- If still in range after windup
+        if dist < 7 then
+             local targetHumanoid = botData.target:FindFirstChild("Humanoid")
+             if targetHumanoid then
+                 -- Calculate Damage
+                 local baseDamage = 10
+                 if botData.difficulty == "HARD" then baseDamage = 15 end
+                 
+                 local damage = baseDamage + math.random(-2, 5)
+                 targetHumanoid:TakeDamage(damage)
+                 
+                 -- Send visual feedback event if it's a real player
+                 local hitPlayer = Players:GetPlayerFromCharacter(botData.target)
+                 if hitPlayer then
+                     -- Maybe shake screen?
+                 end
+             end
         end
+    end
+end
+
+-- Attack function (Deprecated by executeAttack, kept as fallback/helper)
+function BotController:attackTarget(botData, target)
+    BotController:executeAttack(botData)
+end
+
+-- Notify bot effectively took damage (Call this from WeaponSystem)
+function BotController:onBotHit(botData, damage, attacker)
+    if botData.state == "eliminated" then return end
+    
+    -- Stun chance based on damage
+    if damage > 15 or math.random() < 0.3 then
+        botData.state = "stunned"
+        botData.lastAction = tick()
+        
+        -- Visual Stun
+        local hum = botData.character:FindFirstChild("Humanoid")
+        if hum then hum.Jump = true end -- Hop when hit
+    end
+    
+    -- Aggro on attacker
+    if attacker and attacker ~= botData.target then
+        botData.target = attacker
+        botData.state = "hunting"
     end
 end
 

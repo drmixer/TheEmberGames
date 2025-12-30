@@ -1,4 +1,4 @@
--- LocalScript: TributeIntro.lua
+A-- LocalScript: TributeIntro.lua
 -- Handles the cinematic "Tube Rise" sequence visuals and audio
 -- Adds a premium feel to the match start
 
@@ -45,6 +45,7 @@ function TributeIntro.playRiseSequence(duration)
     
     -- Camera Loop
     local connection
+    connection = RunService.RenderStepped:Connect(function()
         if not shakeActive then 
             connection:Disconnect()
             return 
@@ -53,10 +54,14 @@ function TributeIntro.playRiseSequence(duration)
         -- Update Camera Position (Follow player as they rise)
         if Player.Character and Player.Character.PrimaryPart then
              local currentRoot = Player.Character.PrimaryPart
-             local directionToCenter = (center - currentRoot.Position).Unit
-             -- Maintain position behind player
-             local camPos = currentRoot.Position - (directionToCenter * 12) + Vector3.new(0, 5, 0)
-             Camera.CFrame = CFrame.lookAt(camPos, center)
+             local currentRoot = Player.Character.PrimaryPart
+             
+             -- Fix: Keep camera behind player, looking forward (No center lock)
+             local fwd = currentRoot.CFrame.LookVector
+             local camPos = currentRoot.Position - (fwd * 10) + Vector3.new(0, 4, 0)
+             
+             -- Maintain standard third-person angle
+             Camera.CFrame = CFrame.lookAt(camPos, currentRoot.Position + Vector3.new(0, 2, 0))
         end
         
         local elapsed = tick() - startTime
@@ -92,11 +97,34 @@ function TributeIntro.playRiseSequence(duration)
             mechSound:Stop()
             mechSound:Destroy()
             
-            -- Reset Camera (Deferred to ensure smooth transition)
-            local currentCF = Camera.CFrame
-            task.defer(function()
-                 Camera.CameraType = Enum.CameraType.Custom
-                 Camera.CFrame = currentCF
+            -- TRANSITION FIX: Smoothly blend to player's view before releasing control
+            local transitionStart = tick()
+            local transitionDuration = 0.5
+            local startTransCF = Camera.CFrame
+            
+            local transConnection
+            transConnection = RunService.RenderStepped:Connect(function()
+                local t = (tick() - transitionStart) / transitionDuration
+                
+                -- Target: Player's Head CFrame (First Person / Close Third)
+                local char = Player.Character
+                if not char then return end
+                local head = char:FindFirstChild("Head") 
+                if not head then return end
+                
+                -- We want to match where the custom camera starts (usually slightly behind)
+                -- But smooth lerp to head is a good robust reset
+                local targetCF = head.CFrame * CFrame.new(0, 0, 0) -- Or desired start offset
+                
+                if t >= 1 then
+                    transConnection:Disconnect()
+                    Camera.CameraType = Enum.CameraType.Custom
+                    -- Explicitly set Subject to ensure it locks back correctly
+                    Camera.CameraSubject = char:FindFirstChild("Humanoid")
+                    return
+                end
+                
+                Camera.CFrame = startTransCF:Lerp(targetCF, t)
             end)
         end
     end)

@@ -249,7 +249,7 @@ local WEAPONS = {
         rarity = "uncommon",
         stackSize = 5,
         description = "A balanced throwing knife. Fast and accurate.",
-        ammoType = "knife",
+        ammoType = "ThrowingKnife",
         model = {
             meshId = "rbxassetid://121944778", -- Classic Dagger
             scale = Vector3.new(0.6, 0.6, 0.6),
@@ -703,34 +703,43 @@ function WeaponSystem:processMeleeAttack(player, direction)
     
     if result then
         hitPosition = result.Position
-        
-        -- Check if we hit a player
         local hitPart = result.Instance
-        local hitPlayer = Players:GetPlayerFromCharacter(hitPart.Parent)
+        local char = hitPart.Parent
         
-        if hitPlayer then
-            targetHit = hitPlayer
+        -- Check if it's a character (Player or Bot)
+        if char:FindFirstChild("Humanoid") then
+             targetHit = char
+        elseif char.Parent:FindFirstChild("Humanoid") then
+             targetHit = char.Parent
         end
     end
     
-    -- If raycast didn't hit, try sphere detection
+    -- If raycast didn't hit, try sphere detection (Cone Check)
     if not targetHit then
-        -- Find all players within range in front direction
-        for _, otherPlayer in pairs(Players:GetPlayers()) do
-            if otherPlayer ~= player and otherPlayer.Character then
-                local otherHrp = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if otherHrp then
-                    local toTarget = otherHrp.Position - origin
-                    local distance = toTarget.Magnitude
+        -- Use OverlapParams to find any character in range
+        local overlapParams = OverlapParams.new()
+        overlapParams.FilterDescendantsInstances = {character}
+        overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local parts = workspace:GetPartBoundsInRadius(origin, range, overlapParams)
+        local potentialTargets = {}
+        
+        for _, part in ipairs(parts) do
+            local char = part.Parent
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and char ~= character and hum.Health > 0 and not potentialTargets[char] then
+                potentialTargets[char] = true
+                
+                -- Check Direction (Cone)
+                local charHrp = char:FindFirstChild("HumanoidRootPart")
+                if charHrp then
+                    local toTarget = charHrp.Position - origin
+                    local dot = toTarget.Unit:Dot(direction.Unit)
                     
-                    -- Check if within range and roughly in attack direction
-                    if distance <= range then
-                        local dot = toTarget.Unit:Dot(direction.Unit)
-                        if dot > 0.3 then -- Within ~70 degree cone
-                            targetHit = otherPlayer
-                            hitPosition = otherHrp.Position
-                            break
-                        end
+                    if dot > 0.4 then -- Within ~65 degree cone
+                         targetHit = char
+                         hitPosition = charHrp.Position
+                         break -- Switch to closest check if needed, but first found is decent for now
                     end
                 end
             end
@@ -797,9 +806,29 @@ function WeaponSystem:processRangedAttack(player, direction, chargeAmount)
     
     -- Handle Thrown Weapons (Consume the weapon itself)
     if weaponType == "thrown" then
-        -- Force destroy weapon regardless of durability setting
-        equippedTool:Destroy()
-        -- Note: If we had stacking, we would reduce stack here. Currently 1 tool = 1 throw.
+        -- Get InventoryController
+        local success, InventoryController = pcall(function()
+            return require(script.Parent.InventoryController)
+        end)
+        
+        if success and InventoryController then
+             local weaponName = equippedTool:GetAttribute("WeaponId") or equippedTool.Name
+             
+             -- Decrease count
+             InventoryController:removeItem(player, weaponName, 1)
+             
+             -- Check if any left
+             local count = InventoryController:getItemCount(player, weaponName)
+             if count <= 0 then
+                  equippedTool:Destroy()
+             end
+        else
+             -- Fallback if no InventoryController
+             equippedTool:Destroy()
+        end
+        
+        -- Prevent durability reduction for thrown weapons (since they are consumed)
+        -- Removing faulty return here
     end
     
     -- Update cooldown
@@ -812,7 +841,9 @@ function WeaponSystem:processRangedAttack(player, direction, chargeAmount)
     weaponSystemRemote:FireAllClients("WEAPON_SHOOT", player.UserId, weaponId, direction)
     
     -- Reduce durability
-    WeaponSystem:reduceDurability(player, equippedTool)
+    if weaponType ~= "thrown" then
+        WeaponSystem:reduceDurability(player, equippedTool)
+    end
     
     return projectileId
 end
@@ -924,7 +955,7 @@ function WeaponSystem:createProjectile(player, origin, direction, speed, damage,
             
             -- Valid hit? (Solid object or humanoid part)
             if hitPart.CanCollide or hitPart.Parent:FindFirstChild("Humanoid") or hitPart.Parent.Parent:FindFirstChild("Humanoid") then
-                -- print("[WeaponSystem] Hit: " .. hitPart.Name) -- Commented out debug
+                print("[WeaponSystem] Hit: " .. hitPart.Name) -- Enabled debug
                     
                     connection:Disconnect()
                     
@@ -993,13 +1024,25 @@ function WeaponSystem:applyDamage(attacker, target, weapon, hitPosition)
         local humanoid = target:FindFirstChild("Humanoid") or (target.Parent and target.Parent:FindFirstChild("Humanoid"))
         if humanoid then
             humanoid:TakeDamage(damage)
+            
+            -- TRIGGER BOT STUN/REACTION
+            local botSuccess, BotController = pcall(function() return require(script.Parent.BotController) end)
+            if botSuccess and BotController then
+                -- Check if this is a managed bot
+                for _, bot in pairs(BotController.bots) do
+                    if bot.character == target then
+                         BotController:onBotHit(bot, damage, attacker)
+                         break
+                    end
+                end
+            end
         end
     end
     
     -- Apply status effect
     if statusEffect and math.random() < statusChance then
-        if psSuccess and PlayerStats then
-            PlayerStats:addStatusEffect(target, statusEffect, statusDuration, 1)
+        if targetPlayer and psSuccess and PlayerStats then
+            PlayerStats:addStatusEffect(targetPlayer, statusEffect, statusDuration, 1) -- Fix: Pass Player not Character
         end
     end
     

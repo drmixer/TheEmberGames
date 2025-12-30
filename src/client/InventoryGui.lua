@@ -231,9 +231,16 @@ function InventoryGui:selectQuickSlot(slotNumber)
     if realIndex then
          InventoryGui.playerInventory.activeSlot = realIndex
          InventoryGui:useItem(realIndex)
-    else
+     else
          -- Empty visual slot selected
          InventoryGui.playerInventory.activeSlot = -1
+         
+         -- UNEQUIP TOOLS
+         local p = Players.LocalPlayer
+         if p and p.Character then
+             local hum = p.Character:FindFirstChild("Humanoid")
+             if hum then hum:UnequipTools() end
+         end
     end
     
     -- Visual update (Highlighting the VISUAL slot)

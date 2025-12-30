@@ -210,19 +210,18 @@ local function createCraftingUI()
     ingredientsTitle.TextSize = 12
     ingredientsTitle.Parent = detailsFrame
     
-    local ingredientsList = Instance.new("TextLabel")
-    ingredientsList.Name = "IngredientsList"
-    ingredientsList.Size = UDim2.new(1, -20, 0, 80)
-    ingredientsList.Position = UDim2.new(0, 10, 0, 120)
-    ingredientsList.BackgroundTransparency = 1
-    ingredientsList.Text = ""
-    ingredientsList.TextColor3 = Color3.fromRGB(180, 180, 180)
-    ingredientsList.TextXAlignment = Enum.TextXAlignment.Left
-    ingredientsList.TextYAlignment = Enum.TextYAlignment.Top
-    ingredientsList.TextWrapped = true
-    ingredientsList.Font = Enum.Font.Gotham
-    ingredientsList.TextSize = 14
-    ingredientsList.Parent = detailsFrame
+    -- Replacing TextList with ScrollingFrame Container
+    local ingredientsContainer = Instance.new("ScrollingFrame")
+    ingredientsContainer.Name = "IngredientsContainer"
+    ingredientsContainer.Size = UDim2.new(1, -20, 0, 100)
+    ingredientsContainer.Position = UDim2.new(0, 10, 0, 125)
+    ingredientsContainer.BackgroundTransparency = 1
+    ingredientsContainer.BorderSizePixel = 0
+    ingredientsContainer.Parent = detailsFrame
+    
+    local icLayout = Instance.new("UIListLayout")
+    icLayout.Padding = UDim.new(0, 5)
+    icLayout.Parent = ingredientsContainer
     
     local resultLabel = Instance.new("TextLabel")
     resultLabel.Name = "ResultLabel"
@@ -321,6 +320,20 @@ local function createCategoryTabs()
     end
 end
 
+-- Check can craft
+local function canCraftRecipe(recipeId)
+    local recipeData = CraftingGui.recipes[recipeId]
+    if not recipeData then return false end
+    
+    for _, ing in ipairs(recipeData.ingredients) do
+        local count = CraftingGui.playerInventory[ing.itemName] or 0
+        if count < ing.amount then
+            return false
+        end
+    end
+    return true
+end
+
 -- Populate recipe list
 local function populateRecipeList()
     if not CraftingGui.craftingGui then return end
@@ -340,6 +353,8 @@ local function populateRecipeList()
         if recipeData.category == CraftingGui.currentCategory then
             recipeCount = recipeCount + 1
             
+            local canCraft = canCraftRecipe(recipeId)
+            
             local recipeButton = Instance.new("TextButton")
             recipeButton.Name = recipeId
             recipeButton.Size = UDim2.new(1, -10, 0, 60)
@@ -351,6 +366,14 @@ local function populateRecipeList()
             local recipeCorner = Instance.new("UICorner")
             recipeCorner.CornerRadius = UDim.new(0, 6)
             recipeCorner.Parent = recipeButton
+            
+            -- Can Craft Stroke
+            if canCraft then
+                local s = Instance.new("UIStroke")
+                s.Color = Color3.fromRGB(50, 200, 50) -- Green
+                s.Thickness = 2
+                s.Parent = recipeButton
+            end
             
             -- Recipe name
             local recipeTitle = Instance.new("TextLabel")
@@ -424,12 +447,59 @@ function CraftingGui:selectRecipe(recipeId, recipeData)
     -- Update description
     detailsFrame.DetailsDesc.Text = recipeData.description or "No description available."
     
-    -- Update ingredients
-    local ingText = ""
-    for _, ingredient in ipairs(recipeData.ingredients) do
-        ingText = ingText .. "• " .. ingredient.itemName .. " x" .. ingredient.amount .. "\n"
+    -- Update ingredients (Visual List)
+    local container = detailsFrame.IngredientsContainer
+    for _, c in pairs(container:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
     end
-    detailsFrame.IngredientsList.Text = ingText
+    
+    for _, ingredient in ipairs(recipeData.ingredients) do
+        local myCount = CraftingGui.playerInventory[ingredient.itemName] or 0
+        local hasEnough = myCount >= ingredient.amount
+        
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, 0, 0, 25)
+        row.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+        row.BorderSizePixel = 0
+        row.Parent = container
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = row
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, -70, 1, 0)
+        nameLabel.Position = UDim2.new(0, 5, 0, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = ingredient.itemName
+        nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.TextSize = 12
+        nameLabel.Parent = row
+        
+        local countLabel = Instance.new("TextLabel")
+        countLabel.Size = UDim2.new(0, 60, 1, 0)
+        countLabel.Position = UDim2.new(1, -65, 0, 0)
+        countLabel.BackgroundTransparency = 1
+        countLabel.Text = myCount .. "/" .. ingredient.amount
+        countLabel.TextColor3 = hasEnough and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+        countLabel.TextXAlignment = Enum.TextXAlignment.Right
+        countLabel.Font = Enum.Font.GothamBold
+        countLabel.TextSize = 12
+        countLabel.Parent = row
+
+        -- Tooltip
+        row.MouseEnter:Connect(function()
+             -- Show simple tooltip
+             nameLabel.Text = ingredient.itemName .. " (Found in World)" -- Placeholder text
+             row.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        end)
+        row.MouseLeave:Connect(function()
+            nameLabel.Text = ingredient.itemName
+            row.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+        end)
+    end
     
     -- Update result
     detailsFrame.ResultLabel.Text = "➡️ Creates: " .. recipeData.result.amount .. "x " .. recipeData.result.itemName
@@ -498,6 +568,7 @@ function CraftingGui:fetchRecipes()
     if CraftRemoteFunction then
         local recipes = CraftRemoteFunction:InvokeServer("GET_RECIPES")
         local categories = CraftRemoteFunction:InvokeServer("GET_CATEGORIES")
+        local inventory = CraftRemoteFunction:InvokeServer("GET_INVENTORY") -- NEW: Fetch inventory
         
         if recipes then
             CraftingGui.recipes = recipes
@@ -505,6 +576,10 @@ function CraftingGui:fetchRecipes()
         
         if categories then
             CraftingGui.categories = categories
+        end
+        
+        if inventory then
+            CraftingGui.playerInventory = inventory
         end
         
         createCategoryTabs()

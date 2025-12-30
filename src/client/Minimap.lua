@@ -367,7 +367,17 @@ function Minimap.init()
     local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
     if matchRemote then
         matchRemote.OnClientEvent:Connect(function(eventType, data)
-            if eventType == "MATCH_START" then
+            if eventType == "MATCH_STARTED" then
+                Minimap:show()
+            end
+        end)
+    end
+
+    -- Listen for match starting (on platforms)
+    local lobbyRemote = ReplicatedStorage:FindFirstChild("LobbyRemoteEvent")
+    if lobbyRemote then
+        lobbyRemote.OnClientEvent:Connect(function(eventType, data)
+            if eventType == "MATCH_STARTING" then
                 Minimap:show()
             end
         end)

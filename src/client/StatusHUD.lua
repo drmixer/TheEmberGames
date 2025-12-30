@@ -228,7 +228,19 @@ function StatusHUD.init()
     local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
     if matchRemote then
         matchRemote.OnClientEvent:Connect(function(eventType, data)
-            if eventType == "MATCH_START" then
+            if eventType == "MATCH_STARTED" then
+                StatusHUD:show()
+            elseif eventType == "RETURN_TO_LOBBY" then
+                StatusHUD:hide()
+            end
+        end)
+    end
+
+    -- Listen for match starting (on platforms)
+    local lobbyRemote = ReplicatedStorage:FindFirstChild("LobbyRemoteEvent")
+    if lobbyRemote then
+        lobbyRemote.OnClientEvent:Connect(function(eventType, data)
+            if eventType == "MATCH_STARTING" then
                 StatusHUD:show()
             end
         end)

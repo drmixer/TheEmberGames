@@ -55,31 +55,9 @@ local function createCountdownFrame()
     overlay.Visible = false
     overlay.Parent = CountdownUI.screenGui
     
-    -- Dark vignette edges
-    local topVignette = Instance.new("Frame")
-    topVignette.Name = "TopVignette"
-    topVignette.Size = UDim2.new(1, 0, 0.15, 0)
-    topVignette.Position = UDim2.new(0, 0, 0, 0)
-    topVignette.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    topVignette.BorderSizePixel = 0
-    topVignette.Parent = overlay
-    
-    local topGradient = Instance.new("UIGradient")
-    topGradient.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    topGradient.Rotation = 90
-    topGradient.Parent = topVignette
-    
-    local bottomVignette = topVignette:Clone()
-    bottomVignette.Name = "BottomVignette"
-    bottomVignette.Position = UDim2.new(0, 0, 0.85, 0)
-    local bottomGradient = bottomVignette:FindFirstChild("UIGradient")
-    if bottomGradient then
-        bottomGradient.Rotation = -90
-    end
-    bottomVignette.Parent = overlay
+    -- Vignettes removed based on user feedback to prevent "weird overlay"
+    -- local topVignette = ...
+    -- local bottomVignette = ...
     
     -- Center countdown container
     local centerFrame = Instance.new("Frame")
