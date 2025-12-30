@@ -373,19 +373,8 @@ function Minimap.init()
         end)
     end
     
-    -- Listen for Lobby/Countdown events to show Map early (during tube rise)
-    local lobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 5)
-    if lobbyRemote then
-        lobbyRemote.OnClientEvent:Connect(function(eventType, ...)
-            if eventType == "COUNTDOWN_START" or eventType == "MATCH_STARTING" then
-                Minimap:show()
-            elseif eventType == "COUNTDOWN_CANCELLED" or eventType == "LOBBY_RETURN" then
-                Minimap:hide()
-            end
-        end)
-    else
-        warn("[Minimap] LobbyRemoteEvent not found!")
-    end
+    -- Removed LobbyRemoteEvent listener to prevent Map appearing during countdown.
+    -- Map will now only appear on MATCH_START (handled above).
     
     local eventsRemote = ReplicatedStorage:WaitForChild("EventsRemoteEvent", 10)
     if eventsRemote then

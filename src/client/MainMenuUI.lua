@@ -140,9 +140,22 @@ local function createSidebar(parent)
     
     -- 1. PLAY (Primary)
     local playBtn = addButton("PLAY", "⚔️", 1, UITheme.Colors.Success, function()
-        MainMenuUI:hide()
+        -- Don't hide immediately, wait for server confirmation
+        -- MainMenuUI:hide() 
         local lobbyRemote = ReplicatedStorage:FindFirstChild("LobbyRemoteEvent")
-        if lobbyRemote then lobbyRemote:FireServer("QUEUE_FOR_MATCH") end
+        if lobbyRemote then 
+            lobbyRemote:FireServer("QUEUE_FOR_MATCH") 
+            
+            -- Feedback
+             -- Feedback
+             local btn = navContainer:FindFirstChild("Button_Play")
+             if btn then
+                 local label = btn:FindFirstChild("TextLabel")
+                 if label then
+                     label.Text = "      JOINING..."
+                 end
+             end
+        end
     end)
     playBtn.Name = "Button_Play"
     
@@ -364,37 +377,9 @@ function MainMenuUI.init()
     if lobbyRemote then
         lobbyRemote.OnClientEvent:Connect(function(eventType, data)
             if eventType == "MATCH_STARTING" then
-                -- Create persistent transition curtain
-                local transitionGui = Instance.new("ScreenGui")
-                transitionGui.Name = "MatchTransition"
-                transitionGui.IgnoreGuiInset = true
-                transitionGui.DisplayOrder = 200 -- Above everything
-                transitionGui.ResetOnSpawn = false
-                transitionGui.Parent = PlayerGui
-                
-                local curtain = Instance.new("Frame")
-                curtain.Size = UDim2.new(1, 0, 1, 0)
-                curtain.BackgroundColor3 = Color3.new(0,0,0)
-                curtain.BackgroundTransparency = 1
-                curtain.Parent = transitionGui
-            
-                local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                local fadeIn = TweenService:Create(curtain, tweenInfo, {BackgroundTransparency = 0})
-                fadeIn:Play()
-                fadeIn.Completed:Wait()
-                
+                -- Hide menu now (Loading Screen will show up via its own listener)
                 MainMenuUI:hide()
-                
-                -- Wait for teleport/spawn (server processing)
-                task.wait(1.5)
-                
-                -- Fade Out (Reveal Arena)
-                local fadeOut = TweenService:Create(curtain, tweenInfo, {BackgroundTransparency = 1})
-                fadeOut:Play()
-                
-                fadeOut.Completed:Connect(function()
-                    transitionGui:Destroy()
-                end)
+
             elseif eventType == "COUNTDOWN_UPDATE" then
                 MainMenuUI:updateCountdown(data)
             end

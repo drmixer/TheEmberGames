@@ -234,19 +234,8 @@ function StatusHUD.init()
         end)
     end
 
-    -- Listen for Lobby/Countdown events to show HUD early (during tube rise)
-    local lobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 5)
-    if lobbyRemote then
-        lobbyRemote.OnClientEvent:Connect(function(eventType, ...)
-            if eventType == "COUNTDOWN_START" or eventType == "MATCH_STARTING" then
-                StatusHUD:show()
-            elseif eventType == "COUNTDOWN_CANCELLED" or eventType == "LOBBY_RETURN" then
-                StatusHUD:hide()
-            end
-        end)
-    else
-        warn("[StatusHUD] LobbyRemoteEvent not found!")
-    end
+    -- Removed LobbyRemoteEvent listener to prevent HUD appearing during countdown.
+    -- HUD will now only appear on MATCH_START (handled above).
     
     -- Wait for StatsRemoteEvent
     local remote = ReplicatedStorage:WaitForChild("StatsRemoteEvent", 10)
