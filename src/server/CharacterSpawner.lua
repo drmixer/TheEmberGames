@@ -228,6 +228,13 @@ function CharacterSpawner:spawnPlayer(player)
          local hum = char:WaitForChild("Humanoid", 10)
          if not root or not hum then return end
          
+         -- Remove spawn bubble/forcefield
+         for _, child in ipairs(char:GetChildren()) do
+             if child:IsA("ForceField") then
+                 child:Destroy()
+             end
+         end
+         
          -- Find platform
          local platformName = "Platform_" .. index
          local platformsFolder = workspace:FindFirstChild("SpawnPlatforms")
