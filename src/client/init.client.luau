@@ -41,6 +41,7 @@ safeRequire("NightSkyTributes")
 safeRequire("SupplyDropVisuals")
 safeRequire("HazardVisuals")
 safeRequire("StormVisuals")
+safeRequire("MusicController")
 
 -- Combat & Movement
 safeRequire("WeaponController")
