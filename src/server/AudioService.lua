@@ -32,20 +32,20 @@ local SOUND_IDS = {
     CRICKETS = "rbxassetid://9046680461", -- Cricket chirping night
     
     -- Combat sounds (verified weapon SFX)
-    SWORD_SWING = "rbxassetid://6241709963", -- Verified sword swing metal heavy
-    SWORD_HIT = "rbxassetid://6230938264", -- Verified sword impact/hit
-    BLUNT_HIT = "rbxassetid://3041190784", -- Verified blunt impact
-    BOW_DRAW = "rbxassetid://6230981039", -- Bow draw tension
-    BOW_RELEASE = "rbxassetid://6230980816", -- Bow release/arrow launch
-    ARROW_HIT = "rbxassetid://6230980591", -- Arrow impact
-    KNIFE_SLASH = "rbxassetid://6230938036", -- Knife slash SFX
-    PUNCH = "rbxassetid://3041190784", -- Punch/body impact
+    SWORD_SWING = "rbxassetid://12222216", -- Classic Blade Swing
+    SWORD_HIT = "rbxassetid://12222152", -- Classic Punch/Hit
+    BLUNT_HIT = "rbxassetid://12222084", -- Classic Hit Marker
+    BOW_DRAW = "rbxassetid://12222216", -- Reusing Swing (soft whoosh)
+    BOW_RELEASE = "rbxassetid://12222200", -- Classic Bow Fire
+    ARROW_HIT = "rbxassetid://12222152", -- Reusing Hit
+    KNIFE_SLASH = "rbxassetid://12222216", -- Classic Blade Swing
+    PUNCH = "rbxassetid://12222152", -- Classic Punch
     
     -- Pickup sounds (verified item interaction)
-    ITEM_PICKUP = "rbxassetid://9046243962", -- Generic item pickup
+    ITEM_PICKUP = "rbxassetid://131138839", -- Verified click/pickup
     WEAPON_PICKUP = "rbxassetid://6230938036", -- Weapon pickup (metallic)
     LOOT_OPEN = "rbxassetid://9046219171", -- Chest/container open
-    FOOD_PICKUP = "rbxassetid://9046243962", -- Food item pickup
+    FOOD_PICKUP = "rbxassetid://131138839", -- Eating/pickup (reused verified)
     WATER_PICKUP = "rbxassetid://9046225414", -- Water/liquid sound
     
     -- Warning sounds (verified alert/danger sounds)
@@ -56,9 +56,9 @@ local SOUND_IDS = {
     ZONE_CLOSING = "rbxassetid://9046683891", -- Alert/siren warning
     
     -- UI sounds (verified interface sounds)
-    COUNTDOWN_TICK = "rbxassetid://9046239626", -- Countdown tick/beep
-    MATCH_START = "rbxassetid://9046240113", -- Match start horn/gong
-    VICTORY_FANFARE = "rbxassetid://9046240113", -- Victory fanfare
+    COUNTDOWN_TICK = "rbxassetid://138084889", -- Verified beep
+    MATCH_START = "rbxassetid://4612342533", -- Verified Battle Start
+    VICTORY_FANFARE = "rbxassetid://460627223", -- Verified Victory Theme
     ELIMINATION_CANNON = "rbxassetid://5034047634", -- Verified cannon shot SFX
     
     -- Footstep variations (verified terrain footsteps)

@@ -96,46 +96,50 @@ end
 -- Create spark effect (metal on metal or weapon hit)
 function WeaponEffects:createSparkEffect(position)
     local colors = {
-        PARTICLE_COLORS.SPARK[1],
-        PARTICLE_COLORS.SPARK[2],
-        PARTICLE_COLORS.SPARK[3]
+        Color3.fromRGB(255, 255, 150), -- White-Yellow
+        Color3.fromRGB(255, 180, 50),  -- Orange
+        Color3.fromRGB(255, 220, 100), -- Bright Yellow
     }
     
-    -- Colorsequence needs at least 2 keypoints
+    -- Colorsequence 
     local colorSeq = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, colors[math.random(1, #colors)]),
-        ColorSequenceKeypoint.new(1, colors[math.random(1, #colors)])
+        ColorSequenceKeypoint.new(0, colors[1]),
+        ColorSequenceKeypoint.new(0.5, colors[2]),
+        ColorSequenceKeypoint.new(1, colors[3])
     })
     
-    createParticleBurst(position, colorSeq.Keypoints[1].Value, CONFIG.HIT_PARTICLE_COUNT, CONFIG.SPARK_LIFETIME, 20, 0.3)
+    -- High speed sparks
+    createParticleBurst(position, colorSeq, 20, 0.4, 35, 0.2)
     
     -- Add a flash of light
     local flash = Instance.new("Part")
     flash.Name = "SparkFlash"
-    flash.Size = Vector3.new(0.5, 0.5, 0.5)
+    flash.Size = Vector3.new(0.8, 0.8, 0.8)
     flash.Position = position
     flash.Anchored = true
     flash.CanCollide = false
     flash.Material = Enum.Material.Neon
-    flash.Color = Color3.fromRGB(255, 200, 100)
-    flash.Transparency = 0
+    flash.Color = Color3.fromRGB(255, 220, 150)
+    flash.Transparency = 0.2
     flash.Parent = workspace
     
     -- Add point light
     local light = Instance.new("PointLight")
     light.Color = Color3.fromRGB(255, 200, 100)
-    light.Brightness = 3
-    light.Range = 8
+    light.Brightness = 5
+    light.Range = 12
+    light.Shadows = true
     light.Parent = flash
     
     -- Fade out quickly
-    local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     local fadeTween = TweenService:Create(flash, tweenInfo, {
         Transparency = 1,
-        Size = Vector3.new(1, 1, 1)
+        Size = Vector3.new(0.1, 0.1, 0.1)
     })
     local lightTween = TweenService:Create(light, tweenInfo, {
-        Brightness = 0
+        Brightness = 0,
+        Range = 0
     })
     
     fadeTween:Play()
@@ -160,32 +164,42 @@ function WeaponEffects:createBloodEffect(position)
     
     local emitter = Instance.new("ParticleEmitter")
     emitter.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, colors[1]),
-        ColorSequenceKeypoint.new(0.5, colors[2]),
-        ColorSequenceKeypoint.new(1, colors[3])
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), -- Bright red start
+        ColorSequenceKeypoint.new(0.4, Color3.fromRGB(180, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0)) -- Dark red end
     })
     emitter.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.4),
-        NumberSequenceKeypoint.new(0.3, 0.3),
-        NumberSequenceKeypoint.new(1, 0.1)
+        NumberSequenceKeypoint.new(0, 0.6),
+        NumberSequenceKeypoint.new(0.2, 0.5),
+        NumberSequenceKeypoint.new(1, 0.2)
     })
     emitter.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.2),
-        NumberSequenceKeypoint.new(0.7, 0.5),
+        NumberSequenceKeypoint.new(0, 0.1),
+        NumberSequenceKeypoint.new(0.8, 0.4),
         NumberSequenceKeypoint.new(1, 1)
     })
-    emitter.Lifetime = NumberRange.new(0.3, 0.6)
-    emitter.Speed = NumberRange.new(10, 25)
-    emitter.SpreadAngle = Vector2.new(120, 120)
+    emitter.Lifetime = NumberRange.new(0.5, 0.8)
+    emitter.Speed = NumberRange.new(15, 30) -- Fast splatter
+    emitter.SpreadAngle = Vector2.new(360, 360) -- Omnidirectional
     emitter.Rate = 0
-    emitter.RotSpeed = NumberRange.new(-100, 100)
-    emitter.Acceleration = Vector3.new(0, -50, 0) -- Gravity
-    emitter.Drag = 2
+    emitter.RotSpeed = NumberRange.new(-300, 300)
+    emitter.Acceleration = Vector3.new(0, -60, 0) -- Heavy gravity
+    emitter.Drag = 3
     emitter.Parent = particleHolder
     
-    emitter:Emit(CONFIG.HIT_PARTICLE_COUNT)
+    -- Main Burst
+    emitter:Emit(30)
     
-    Debris:AddItem(particleHolder, CONFIG.BLOOD_LIFETIME + 0.3)
+    -- Secondary mist (fine spray)
+    local mist = emitter:Clone()
+    mist.Speed = NumberRange.new(5, 12)
+    mist.Size = NumberSequence.new(0.3, 0.1)
+    mist.Acceleration = Vector3.new(0, -20, 0)
+    mist.Lifetime = NumberRange.new(0.8, 1.2)
+    mist.Parent = particleHolder
+    mist:Emit(20)
+    
+    Debris:AddItem(particleHolder, 2)
 end
 
 -- Create combined hit effect (sparks + impact)

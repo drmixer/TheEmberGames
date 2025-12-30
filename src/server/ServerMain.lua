@@ -21,6 +21,7 @@ local WeaponSystem = require(script.Parent.WeaponSystem)
 local TestSetup = require(script.Parent.TestSetup)
 local TestingService = require(script.Parent.TestingService)
 local LightingService = require(script.Parent.LightingService)
+local DefaultSpawn = require(script.Parent.DefaultSpawn) -- Ensure lobby spawn is managed/hidden
 
 -- Phase 5: Multiplayer & Performance modules
 local PerformanceOptimizer = require(script.Parent.PerformanceOptimizer)
@@ -42,6 +43,9 @@ function ServerMain.init()
     
     -- Initialize Lighting (Premium Visuals)
     LightingService.init()
+    
+    -- Initialize Lobby Spawn (Hidden)
+    DefaultSpawn.init()
     
     -- Initialize controllers
     InventoryController:init()

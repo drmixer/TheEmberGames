@@ -26,11 +26,11 @@ matchRemoteEvent.Parent = ReplicatedStorage
 
 -- Sound IDs (Roblox asset IDs - using placeholder IDs, replace with actual sounds)
 local SOUND_IDS = {
-    CANNON = "rbxassetid://1837108707", -- Cannon boom sound
-    MATCH_START_HORN = "rbxassetid://1836154285", -- Horn/gong for match start
+    CANNON = "rbxassetid://169259022", -- Cannon boom (Verified)
+    MATCH_START_HORN = "rbxassetid://12221967", -- Verified Roblox Bell
     COUNTDOWN_BEEP = "rbxassetid://138084957", -- Beep for countdown
     COUNTDOWN_FINAL = "rbxassetid://138084957", -- Final countdown beep
-    VICTORY_MUSIC = "rbxassetid://1837130432", -- Victory music/fanfare
+    VICTORY_MUSIC = "rbxassetid://12222058", -- Verified Victory music
     FIREWORK = "rbxassetid://130788893", -- Firework sound
 }
 
@@ -225,6 +225,14 @@ function MatchService:startMatch()
     -- Play match start horn
     MatchService:playMatchStartHorn()
     
+    -- Release bots
+    local success, BotController = pcall(function()
+        return require(script.Parent.BotController)
+    end)
+    if success and BotController then
+        BotController:unfreezeBots()
+    end
+    
     -- Notify all clients
     matchRemoteEvent:FireAllClients("MATCH_STARTED", {
         startTime = MatchService.matchStartTime,
@@ -282,7 +290,8 @@ function MatchService:triggerVictorySequence(winner)
     end
     
     -- Schedule return to lobby after celebration
-    task.delay(15, function()
+    -- Matching the UI timing (4s wait + 3s countdown + 2s buffer)
+    task.delay(9, function()
         MatchService:returnToLobby()
     end)
 end
@@ -312,6 +321,14 @@ function MatchService:returnToLobby()
     MatchService.eliminatedPlayers = {}
     MatchService.winner = nil
     
+    -- Reset events (Storm, Supply Drops)
+    local success, EventsService = pcall(function()
+        return require(script.Parent.EventsService)
+    end)
+    if success and EventsService then
+        EventsService:resetMatch()
+    end
+    
     -- Clean up all bots
     local success, BotController = pcall(function()
         return require(script.Parent.BotController)
@@ -326,8 +343,48 @@ function MatchService:returnToLobby()
     -- Respawn all players
     for _, player in pairs(Players:GetPlayers()) do
         task.spawn(function()
-            -- Respawn player at lobby spawn
+            -- Respawn player
             player:LoadCharacter()
+            
+            -- Wait for character and force teleport to LobbySpawn
+            local char = player.Character or player.CharacterAdded:Wait()
+            local root = char:WaitForChild("HumanoidRootPart", 5)
+            
+            if root then
+                local lobbySpawn = workspace:FindFirstChild("LobbySpawn")
+                
+                -- Safety: Create LobbySpawn if missing
+                if not lobbySpawn then
+                    print("[MatchService] LobbySpawn missing! Creating emergency platform...")
+                    lobbySpawn = Instance.new("Part")
+                    lobbySpawn.Name = "LobbySpawn"
+                    lobbySpawn.Size = Vector3.new(100, 1, 100)
+                    lobbySpawn.Position = Vector3.new(0, 300, 0) -- High above map
+                    lobbySpawn.Anchored = true
+                    lobbySpawn.Transparency = 1 -- Invisible
+                    lobbySpawn.CastShadow = false
+                    lobbySpawn.CanCollide = true
+                    lobbySpawn.Parent = workspace
+                    
+                    -- Add a spawn location just in case
+                    local spawn = Instance.new("SpawnLocation")
+                    spawn.Name = "LobbySpawnPoint"
+                    spawn.Size = Vector3.new(10, 0.5, 10)
+                    spawn.Position = lobbySpawn.Position + Vector3.new(0, 1, 0)
+                    spawn.Anchored = true
+                    spawn.CanCollide = false
+                    spawn.Transparency = 1
+                    spawn.Parent = lobbySpawn
+                    
+                    local decal = spawn:FindFirstChildOfClass("Decal")
+                    if decal then decal:Destroy() end
+                end
+                
+                if lobbySpawn then
+                    root.CFrame = lobbySpawn.CFrame + Vector3.new(0, 5, 0)
+                    root.AssemblyLinearVelocity = Vector3.zero -- Stop any momentum
+                end
+            end
         end)
     end
     

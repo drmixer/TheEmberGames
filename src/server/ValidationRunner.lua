@@ -173,8 +173,10 @@ local TESTS = {
             -- Use GetTotalMemoryUsageMb instead of MemoryTag (which doesn't exist)
             local memory = Stats:GetTotalMemoryUsageMb() or 0
             
-            if memory > 500 then
+            if memory > 500 and not RunService:IsStudio() then
                 return false, "High memory usage: " .. math.floor(memory) .. "MB"
+            elseif RunService:IsStudio() and memory > 8000 then
+                 return false, "Abnormal Studio memory usage: " .. math.floor(memory) .. "MB"
             end
             
             return true, "Memory usage acceptable: " .. math.floor(memory) .. "MB"

@@ -104,7 +104,40 @@ function SimpleWeapons:createWeapon(weaponId)
     handle.CanCollide = false
     handle.Parent = tool
     
-    -- Add blade/tip/head if defined
+    -- PROCEDURAL BLADE/HEAD/BRANCH CONSTRUCTION
+    if weaponId == "WoodenStick" then
+        handle.Size = Vector3.new(0.25, 3.8, 0.25)
+        handle.Material = Enum.Material.Wood
+        handle.Shape = Enum.PartType.Cylinder
+        handle.CFrame = handle.CFrame * CFrame.Angles(0, 0, math.rad(90))
+        
+        -- Make it look like a natural branch
+        local mainBranch = Instance.new("Part")
+        mainBranch.Name = "Branch"
+        mainBranch.Size = Vector3.new(0.15, 1.2, 0.15) 
+        mainBranch.Color = handle.Color
+        mainBranch.Material = handle.Material
+        mainBranch.CanCollide = false
+        mainBranch.Parent = tool
+        local w1 = Instance.new("Weld", mainBranch)
+        w1.Part0 = handle
+        w1.Part1 = mainBranch
+        w1.C0 = CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(35))
+        
+        local smallBranch = Instance.new("Part")
+        smallBranch.Name = "Branch2"
+        smallBranch.Size = Vector3.new(0.1, 0.6, 0.1)
+        smallBranch.Color = handle.Color
+        smallBranch.Material = handle.Material
+        smallBranch.CanCollide = false
+        smallBranch.Parent = tool
+        local w2 = Instance.new("Weld", smallBranch)
+        w2.Part0 = handle
+        w2.Part1 = smallBranch
+        w2.C0 = CFrame.new(0, -0.5, 0) * CFrame.Angles(0, math.rad(90), math.rad(-25))
+    end
+    
+    -- Add blade/tip/head if defined (Legacy data-driven)
     if weaponDef.blade then
         local blade = Instance.new("Part")
         blade.Name = "Blade"

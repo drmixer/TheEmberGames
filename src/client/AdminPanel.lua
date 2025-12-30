@@ -440,6 +440,13 @@ function AdminPanel.init()
         end
     end)
     
+    -- Chat command: /admin
+    player.Chatted:Connect(function(msg)
+        if msg:lower():match("^/admin") then
+            AdminPanel:toggle()
+        end
+    end)
+    
     print("[AdminPanel] Initialized - Press F8 to toggle")
 end
 

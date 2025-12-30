@@ -142,7 +142,10 @@ function LobbyService:beginMatch()
         end)
         
         if success and BotController then
-            local targetTributes = Config.PLAYER_CAP -- Fill to max capacity (24)
+            -- TEMP: Spawn only 1 bot for testing Victory Sequence
+            local targetTributes = playerCount + 1 
+            -- local targetTributes = Config.PLAYER_CAP -- Original production value
+            
             if playerCount < targetTributes then
                 print("[LobbyService] Filling " .. (targetTributes - playerCount) .. " empty slots with bots...")
                 BotController:fillWithBots(targetTributes)
@@ -150,19 +153,37 @@ function LobbyService:beginMatch()
         end
     end
     
+    -- Initialize Arena (Spawn Loot)
+    local ArenaService = require(script.Parent.ArenaService)
+    ArenaService:initializeMatch()
+    
     -- Notify all players match is starting
     lobbyRemoteEvent:FireAllClients("MATCH_STARTING", LobbyService.currentMatchId)
     
-    -- Start the tribute countdown (players locked on platforms)
+    -- Prepare Platforms (Lower them)
     local CharacterSpawner = require(script.Parent.CharacterSpawner)
-    CharacterSpawner:startCountdown(Config.COUNTDOWN_TIME)
+    CharacterSpawner:preparePlatforms()
     
-    -- Wait for countdown to finish, then release players
-    task.spawn(function()
-        task.wait(Config.COUNTDOWN_TIME)
+    -- Spawn Players on Pedestals (Now underground)
+    for _, player in pairs(Players:GetPlayers()) do
+        if LobbyService.lobbyPlayers[player] then -- Only spawn valid lobby players
+            CharacterSpawner:spawnPlayer(player)
+        end
+    end
+    
+    -- Trigger Rise Sequence
+    local RISE_DURATION = 6
+    CharacterSpawner:risePlatforms(RISE_DURATION)
+    
+    -- Wait for rise to complete before starting countdown
+    task.delay(RISE_DURATION, function()
+         -- Start the tribute countdown (players locked on platforms)
+        CharacterSpawner:startCountdown(Config.COUNTDOWN_TIME)
+    end)
+    
+    -- Initialize match events
+    task.delay(Config.COUNTDOWN_TIME + RISE_DURATION, function()
         CharacterSpawner:endCountdown()
-        
-        -- Initialize match events (storm, supply drops, etc.)
         EventsService:initializeMatch()
     end)
 end
@@ -183,10 +204,11 @@ local function onPlayerAdded(player)
     addPlayerToLobby(player)
     
     -- Check if we have enough players to start countdown automatically
-    if LobbyService.gameState == "WaitingForPlayers" and countLobbyPlayers() >= Config.PLAYER_MIN then
-        task.wait(2) -- Brief delay to allow more players to join
-        LobbyService:startMatchCountdown()
-    end
+    -- DISABLED: We want manual start via "Play" button
+    -- if LobbyService.gameState == "WaitingForPlayers" and countLobbyPlayers() >= Config.PLAYER_MIN then
+    --     task.wait(2) -- Brief delay to allow more players to join
+    --     LobbyService:startMatchCountdown()
+    -- end
     
     -- Handle player leaving
     player.AncestryChanged:Connect(function()

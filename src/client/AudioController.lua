@@ -12,8 +12,9 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
 -- Wait for audio remote event
-local AudioRemoteEvent = ReplicatedStorage:WaitForChild("AudioRemoteEvent", 10)
-local StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent", 10)
+-- Remote events (initialized in init)
+local AudioRemoteEvent = nil
+local StatsRemoteEvent = nil
 
 local AudioController = {}
 AudioController.activeSounds = {}
@@ -364,91 +365,100 @@ function AudioController:checkHealthWarning(health)
 end
 
 -- Initialize AudioController
+-- Initialize AudioController
 function AudioController.init()
     print("[AudioController] Initializing...")
     
     createAudioGui()
     
-    -- Connect to audio remote events
-    if AudioRemoteEvent then
-        AudioRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-            local args = {...}
-            
-            if eventType == "COMBAT_SOUND" then
-                local soundType = args[1]
-                local position = args[2]
-                local volume = args[3]
-                AudioController:playCombatSound(soundType, position, volume)
+    -- Connect to audio remote events asynchronously
+    task.spawn(function()
+        AudioRemoteEvent = ReplicatedStorage:WaitForChild("AudioRemoteEvent", 30)
+        if AudioRemoteEvent then
+            AudioRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+                local args = {...}
                 
-            elseif eventType == "PICKUP_SOUND" then
-                local soundId = args[1]
-                AudioController:playPickupSound(soundId)
-                
-            elseif eventType == "WARNING_SOUND" then
-                local soundId = args[1]
-                local looped = args[2]
-                local warningType = args[3]
-                AudioController:playWarningSound(soundId, looped, warningType)
-                
-            elseif eventType == "STOP_WARNING_SOUND" then
-                local warningType = args[1]
-                AudioController:stopWarningSound(warningType)
-                
-            elseif eventType == "STORM_WARNING" then
-                local phase = args[1]
-                local radius = args[2] -- Expecting radius now
-                local center = args[3] -- Expecting center now
-                -- Use new storm audio system if radius/center provided
-                if radius then
-                    AudioController:startStormAudio(phase, radius, center)
-                else
-                    AudioController:startStormAudio(phase, 1000, Vector3.new(0,0,0)) -- Fallback
+                if eventType == "COMBAT_SOUND" then
+                    local soundType = args[1]
+                    local position = args[2]
+                    local volume = args[3]
+                    AudioController:playCombatSound(soundType, position, volume)
+                    
+                elseif eventType == "PICKUP_SOUND" then
+                    local soundId = args[1]
+                    AudioController:playPickupSound(soundId)
+                    
+                elseif eventType == "WARNING_SOUND" then
+                    local soundId = args[1]
+                    local looped = args[2]
+                    local warningType = args[3]
+                    AudioController:playWarningSound(soundId, looped, warningType)
+                    
+                elseif eventType == "STOP_WARNING_SOUND" then
+                    local warningType = args[1]
+                    AudioController:stopWarningSound(warningType)
+                    
+                elseif eventType == "STORM_WARNING" then
+                    local phase = args[1]
+                    local radius = args[2] -- Expecting radius now
+                    local center = args[3] -- Expecting center now
+                    -- Use new storm audio system if radius/center provided
+                    if radius then
+                        AudioController:startStormAudio(phase, radius, center)
+                    else
+                        AudioController:startStormAudio(phase, 1000, Vector3.new(0,0,0)) -- Fallback
+                    end
+                elseif eventType == "MATCH_END" then
+                    AudioController:stopStormAudio()
                 end
-            elseif eventType == "MATCH_END" then
-                AudioController:stopStormAudio()
-            end
-        end)
-    else
-        warn("[AudioController] AudioRemoteEvent not found")
-    end
+            end)
+        else
+            warn("[AudioController] AudioRemoteEvent timed out")
+        end
+    end)
     
     -- Connect to EventsRemote for storm phases (backup/main source)
-    local EventsRemoteEvent = ReplicatedStorage:FindFirstChild("EventsRemoteEvent")
-    if EventsRemoteEvent then
-        EventsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-            local args = {...}
-            if eventType == "STORM_PHASE_ACTIVE" then
-                local phase = args[1]
-                local radius = args[2]
-                local center = args[3]
-                AudioController:startStormAudio(phase, radius, center)
-            end
-        end)
-    end
+    task.spawn(function()
+        local EventsRemoteEvent = ReplicatedStorage:WaitForChild("EventsRemoteEvent", 30)
+        if EventsRemoteEvent then
+            EventsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+                local args = {...}
+                if eventType == "STORM_PHASE_ACTIVE" then
+                    local phase = args[1]
+                    local radius = args[2]
+                    local center = args[3]
+                    AudioController:startStormAudio(phase, radius, center)
+                end
+            end)
+        end
+    end)
     
     -- Connect to stats for health monitoring
-    if StatsRemoteEvent then
-        StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
-            local args = {...}
-            
-            if eventType == "STAT_UPDATE" then
-                local statName = args[1]
-                local newValue = args[2]
+    task.spawn(function()
+        StatsRemoteEvent = ReplicatedStorage:WaitForChild("StatsRemoteEvent", 30)
+        if StatsRemoteEvent then
+            StatsRemoteEvent.OnClientEvent:Connect(function(eventType, ...)
+                local args = {...}
                 
-                if statName == "health" then
-                    AudioController:checkHealthWarning(newValue)
+                if eventType == "STAT_UPDATE" then
+                    local statName = args[1]
+                    local newValue = args[2]
+                    
+                    if statName == "health" then
+                        AudioController:checkHealthWarning(newValue)
+                    end
+                    
+                elseif eventType == "INITIAL_STATS" then
+                    local stats = args[1]
+                    if stats and stats.health then
+                        AudioController:checkHealthWarning(stats.health)
+                    end
                 end
-                
-            elseif eventType == "INITIAL_STATS" then
-                local stats = args[1]
-                if stats and stats.health then
-                    AudioController:checkHealthWarning(stats.health)
-                end
-            end
-        end)
-    end
+            end)
+        end
+    end)
     
-    print("[AudioController] Initialized successfully")
+    print("[AudioController] Initialized successfully (Connecting remotes async)")
 end
 
 -- Initialize when module loads

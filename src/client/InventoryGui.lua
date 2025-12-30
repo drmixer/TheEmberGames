@@ -21,6 +21,7 @@ InventoryGui.playerInventory = {
     maxSize = 20,
     activeSlot = 1
 }
+InventoryGui.hotbarMapping = {} -- [VisualSlotIndex (1-6)] = InventorySlotIndex (1-20)
 
 local function createSlot(parent, index)
     local slot = Instance.new("ImageButton")
@@ -223,9 +224,19 @@ end
 function InventoryGui:selectQuickSlot(slotNumber)
     if not InventoryGui.inventoryGui then return end
     
-    InventoryGui.playerInventory.activeSlot = slotNumber
+    -- Use mapping to get real inventory index
+    local realIndex = InventoryGui.hotbarMapping[slotNumber]
     
-    -- Visual update
+    -- If mapped to a real slot, select it
+    if realIndex then
+         InventoryGui.playerInventory.activeSlot = realIndex
+         InventoryGui:useItem(realIndex)
+    else
+         -- Empty visual slot selected
+         InventoryGui.playerInventory.activeSlot = -1
+    end
+    
+    -- Visual update (Highlighting the VISUAL slot)
     for i = 1, 6 do
         local slot = InventoryGui.inventoryGui.Hotbar:FindFirstChild("QuickSlot" .. i)
         if slot then
@@ -258,6 +269,35 @@ function InventoryGui:useItem(slotIndex)
     local slotData = InventoryGui.playerInventory.slots[slotIndex]
     if slotData and slotData.name then
         print("Using item:", slotData.name)
+        
+        -- Check if it is an equippable tool first
+        local player = Players.LocalPlayer
+        if player then
+             local backpack = player:FindFirstChild("Backpack")
+             local character = player.Character
+             
+             if backpack and character then
+                 local humanoid = character:FindFirstChild("Humanoid")
+                 
+                 -- Is it in Backpack? Equip it.
+                 local tool = backpack:FindFirstChild(slotData.name)
+                 if tool and humanoid then
+                     humanoid:EquipTool(tool)
+                     return -- Done, it was a weapon
+                 end
+                 
+                 -- Is it already equipped?
+                 local equipped = character:FindFirstChild(slotData.name)
+                 if equipped then
+                     -- Already holding it, nothing to do
+                     return 
+                 end
+                 
+                 -- If not a tool, it might be a consumable handled by server
+             end
+        end
+        
+        -- Fallback to server use (for consumables like Food/Meds)
         InventoryRemoteEvent:FireServer("USE_ITEM", slotData.name)
     end
 end
@@ -265,43 +305,213 @@ end
 function InventoryGui:updateInventoryUI()
     if not InventoryGui.inventoryGui then return end
     
-    local updateSlot = function(containerName, prefix, max)
-        local container = InventoryGui.inventoryGui:FindFirstChild(containerName, true)
-        if not container then return end
+    local function createWeaponPreview(weaponName)
+        local model = Instance.new("Model")
         
-        for i = 1, max do
-            local slot = container:FindFirstChild(prefix .. i)
-            if slot then
-                local data = InventoryGui.playerInventory.slots[i]
-                local icon = slot:FindFirstChild("ItemDisplay")
-                local count = slot:FindFirstChild("ItemCount")
-                
-                if data and data.name then
-                    -- Placeholder icons based on name parsing could go here
-                    -- For now, just show text or color
-                    icon.Image = "" 
-                    icon.BackgroundColor3 = UITheme.Colors.Gold
-                    icon.BackgroundTransparency = 0.8 -- Show it exists
-                    
-                    if data.amount > 1 then
-                        count.Text = tostring(data.amount)
-                        count.Visible = true
-                    else
-                        count.Visible = false
-                    end
-                else
-                    icon.Image = ""
-                    icon.BackgroundTransparency = 1
-                    count.Visible = false
-                end
+        local handle = Instance.new("Part")
+        handle.Name = "Handle"
+        handle.Size = Vector3.new(0.5, 3, 0.5)
+        handle.Anchored = true
+        handle.CanCollide = false
+        handle.Material = Enum.Material.Wood
+        handle.Color = Color3.fromRGB(139, 90, 43)
+        handle.Parent = model
+        
+        -- Simple customizations
+        if string.find(weaponName, "Stick") then
+            handle.Size = Vector3.new(0.3, 3.5, 0.3)
+            -- Branch
+            local b = Instance.new("Part")
+            b.Size = Vector3.new(0.2, 1, 0.2)
+            b.Color = handle.Color
+            b.Material = handle.Material
+            b.Anchored = true; b.CanCollide = false
+            b.CFrame = handle.CFrame * CFrame.new(0, 0.5, 0) * CFrame.Angles(0, 0, math.rad(45))
+            b.Parent = model
+        elseif string.find(weaponName, "Spear") then
+             handle.Size = Vector3.new(0.2, 6, 0.2)
+             local tip = Instance.new("Part")
+             tip.Size = Vector3.new(0.3, 1, 0.3)
+             tip.Color = Color3.fromRGB(150, 150, 150)
+             tip.Material = Enum.Material.Metal
+             tip.Anchored = true; tip.CanCollide = false
+             tip.CFrame = handle.CFrame * CFrame.new(0, 3.5, 0)
+             tip.Parent = model
+        elseif string.find(weaponName, "Sword") or string.find(weaponName, "Machete") then
+             handle.Size = Vector3.new(0.3, 1, 0.3)
+             local blade = Instance.new("Part")
+             blade.Size = Vector3.new(0.2, 3, 0.5)
+             blade.Color = string.find(weaponName, "Ice") and Color3.fromRGB(180, 230, 255) or Color3.fromRGB(150, 150, 160)
+             blade.Material = string.find(weaponName, "Ice") and Enum.Material.Ice or Enum.Material.Metal
+             blade.Anchored = true; blade.CanCollide = false
+             blade.CFrame = handle.CFrame * CFrame.new(0, 2, 0)
+             blade.Parent = model
+        elseif string.find(weaponName, "Axe") then
+             handle.Size = Vector3.new(0.3, 3, 0.3)
+             local head = Instance.new("Part")
+             head.Size = Vector3.new(1.5, 1, 0.3)
+             head.Color = Color3.fromRGB(100, 100, 100)
+             head.Material = Enum.Material.Metal
+             head.Anchored = true; head.CanCollide = false
+             head.CFrame = handle.CFrame * CFrame.new(0, 1, 0)
+             head.Parent = model
+        elseif string.find(weaponName, "Bow") then
+             handle.Size = Vector3.new(0.2, 4, 0.5)
+             handle.Color = Color3.fromRGB(100, 70, 40)
+             local stringP = Instance.new("Part")
+             stringP.Size = Vector3.new(0.05, 4, 0.05)
+             stringP.Color = Color3.new(1,1,1)
+             stringP.Anchored = true; stringP.CanCollide = false
+             stringP.CFrame = handle.CFrame * CFrame.new(0, 0, 0.5)
+             stringP.Parent = model
+        elseif string.find(weaponName, "Slingshot") and not string.find(weaponName, "Ammo") then
+             -- Slingshot Y-Shape
+             handle.Size = Vector3.new(0.3, 1.5, 0.3)
+             local left = Instance.new("Part"); left.Size=Vector3.new(0.2,0.8,0.2); left.Color=handle.Color; left.Anchored=true; left.CanCollide=false; left.CFrame=handle.CFrame*CFrame.new(-0.3,0.8,0)*CFrame.Angles(0,0,math.rad(30)); left.Parent=model
+             local right = Instance.new("Part"); right.Size=Vector3.new(0.2,0.8,0.2); right.Color=handle.Color; right.Anchored=true; right.CanCollide=false; right.CFrame=handle.CFrame*CFrame.new(0.3,0.8,0)*CFrame.Angles(0,0,math.rad(-30)); right.Parent=model
+        elseif string.find(weaponName, "Knife") then
+             -- Dagger/Knife shape
+             handle.Size = Vector3.new(0.2, 0.8, 0.2)
+             local blade = Instance.new("Part")
+             blade.Size = Vector3.new(0.1, 1.2, 0.4)
+             blade.Color = Color3.fromRGB(180, 180, 190)
+             blade.Material = Enum.Material.Metal
+             blade.Anchored = true; blade.CanCollide = false
+             blade.CFrame = handle.CFrame * CFrame.new(0, 1, 0)
+             blade.Parent = model
+        elseif weaponName == "Arrow" then
+             handle.Size = Vector3.new(0.1, 0.1, 2)
+             handle.Color = Color3.fromRGB(139, 90, 43)
+             local f1 = Instance.new("Part"); f1.Size=Vector3.new(0.3,0.3,0.05); f1.Color=Color3.new(1,1,1); f1.Anchored=true; f1.CanCollide=false; f1.CFrame=handle.CFrame*CFrame.new(0,0,0.9); f1.Parent=model
+             local t1 = Instance.new("Part"); t1.Size=Vector3.new(0.2,0.2,0.4); t1.Color=Color3.new(0.5,0.5,0.5); t1.Anchored=true; t1.CanCollide=false; t1.CFrame=handle.CFrame*CFrame.new(0,0,-1); t1.Parent=model
+        elseif weaponName == "SlingshotAmmo" or weaponName == "Rock" then
+             handle.Size = Vector3.new(0.8, 0.8, 0.8)
+             handle.Shape = Enum.PartType.Ball
+             handle.Color = Color3.fromRGB(100, 100, 100)
+             handle.Material = Enum.Material.Slate
+        end
+        
+        return model
+    end
+
+    local updateSlotVisual = function(slot, data)
+        -- Helper to render a slot given data
+        local icon = slot:FindFirstChild("ItemDisplay")
+        local count = slot:FindFirstChild("ItemCount")
+        
+        -- Cleanup previous viewport
+        local oldVp = slot:FindFirstChild("ItemViewport")
+        if oldVp then oldVp:Destroy() end
+
+        if data and data.name then
+            slot.Visible = true 
+            
+            -- Check for required ammo to overlay count
+            local ammoCountDisplay = nil
+            if data.name == "Bow" then
+               for _, invSlot in pairs(InventoryGui.playerInventory.slots) do
+                   if invSlot.name == "Arrow" then ammoCountDisplay = invSlot.amount; break end
+               end
+            elseif data.name == "Slingshot" then
+               for _, invSlot in pairs(InventoryGui.playerInventory.slots) do
+                   if invSlot.name == "SlingshotAmmo" or invSlot.name == "Rock" then ammoCountDisplay = invSlot.amount; break end
+               end
             end
+            
+            -- Create ViewportFrame
+            local vp = Instance.new("ViewportFrame")
+            vp.Name = "ItemViewport"
+            vp.Size = UDim2.new(0.9, 0, 0.9, 0)
+            vp.Position = UDim2.new(0.05, 0, 0.05, 0)
+            vp.BackgroundTransparency = 1
+            vp.Parent = slot
+            
+            local camera = Instance.new("Camera")
+            vp.CurrentCamera = camera
+            camera.Parent = vp
+            
+            local model = createWeaponPreview(data.name)
+            model.Parent = vp
+            
+            -- Setup Camera (Generic Fit)
+            local cf, size = model:GetBoundingBox()
+            local dist = size.Magnitude * 1.2
+            camera.CFrame = CFrame.new(cf.Position + Vector3.new(dist * 0.5, dist * 0.2, dist), cf.Position)
+            
+            icon.Image = "" 
+            icon.Visible = false 
+            
+            if ammoCountDisplay then
+                count.Text = tostring(ammoCountDisplay)
+                count.TextColor3 = Color3.fromRGB(100, 255, 100) -- Green
+                count.Visible = true
+            elseif data.amount > 1 then
+                count.Text = tostring(data.amount)
+                count.TextColor3 = UITheme.Colors.Text
+                count.Visible = true
+            else
+                count.Visible = false
+            end
+        else
+            icon.Image = ""
+            icon.Visible = true
+            count.Visible = false
+            -- Reset visibility check external
+        end
+    end
+
+    -- Update Main Grid (1-20) - Direct Mapping
+    local grid = InventoryGui.inventoryGui:FindFirstChild("InventoryGrid", true)
+    if grid then
+        for i = 1, 20 do
+             local slot = grid:FindFirstChild("Slot" .. i)
+             if slot then
+                  local data = InventoryGui.playerInventory.slots[i]
+                  updateSlotVisual(slot, data)
+                  slot.Visible = true -- Always show grid slots
+             end
         end
     end
     
-    -- Update Main Grid (1-20)
-    updateSlot("InventoryGrid", "Slot", 20)
-    -- Update Hotbar (1-6) (Assuming Hotbar maps to slots 1-6 for simplicity in this demo)
-    updateSlot("Hotbar", "QuickSlot", 6)
+    -- Update Hotbar (1-6) - Smart Mapping
+    local hotbar = InventoryGui.inventoryGui:FindFirstChild("Hotbar", true)
+    if hotbar then
+        -- Reset mapping
+        InventoryGui.hotbarMapping = {}
+        
+        -- Find eligible items for hotbar
+        local eligibleIndices = {}
+        for i, slotData in ipairs(InventoryGui.playerInventory.slots) do
+            if slotData.name then
+                 -- Filter out ammo (using string matching for variants like PoisonArrow)
+                 local name = slotData.name
+                 local isAmmo = (string.find(name, "Arrow") or string.find(name, "Ammo") or name == "Rock")
+                 if not isAmmo then
+                      table.insert(eligibleIndices, i)
+                 end
+            end
+        end
+        
+        -- Fill Hotbar Slots
+        for i = 1, 6 do
+             local slot = hotbar:FindFirstChild("QuickSlot" .. i)
+             if slot then
+                  local invIndex = eligibleIndices[i]
+                  if invIndex then
+                       -- Map it
+                       InventoryGui.hotbarMapping[i] = invIndex
+                       local data = InventoryGui.playerInventory.slots[invIndex]
+                       updateSlotVisual(slot, data)
+                       slot.Visible = true
+                  else
+                       -- Empty / Hidden
+                       updateSlotVisual(slot, nil)
+                       updateSlotVisual(slot, nil)
+                       slot.Visible = true -- Show empty slots so player knows they exist
+                  end
+             end
+        end
+    end
 end
 
 function InventoryGui:init()

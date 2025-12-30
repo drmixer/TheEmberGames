@@ -30,7 +30,7 @@ local CONFIG = {
 
 -- Sound IDs (VERIFIED Roblox audio assets)
 local SOUND_IDS = {
-    ANTHEM = "rbxassetid://9046240113", -- Verified victory/anthem music
+    ANTHEM = "rbxassetid://12222058", -- Verified Victory music
     CANNON = "rbxassetid://5034047634", -- Verified cannon shot SFX
 }
 

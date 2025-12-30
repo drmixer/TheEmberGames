@@ -207,22 +207,13 @@ local function updatePlayerStats()
                 -- Check if player is idle (no activity for 10+ seconds)
                 local isIdle = (currentTime - stats.lastActivity) > 10
                 
-                -- Update hunger based on activity
-                local hungerDrain
-                if isIdle then
-                    hungerDrain = (stats.hungerDrainIdle or stats.hungerDrainRate * 0.5) * timeDelta
-                else
-                    hungerDrain = stats.hungerDrainRate * timeDelta
-                end
+                -- Update hunger (Always use active rate for now to ensure drain works)
+                -- TODO: Implement precise movement tracking for idle rate
+                local hungerDrain = stats.hungerDrainRate * timeDelta
                 PlayerStats:updateStat(player, "hunger", -hungerDrain, true)
                 
-                -- Update thirst based on activity
-                local thirstDrain
-                if isIdle then
-                    thirstDrain = (stats.thirstDrainIdle or stats.thirstDrainRate * 0.7) * timeDelta
-                else
-                    thirstDrain = stats.thirstDrainRate * timeDelta
-                end
+                -- Update thirst
+                local thirstDrain = stats.thirstDrainRate * timeDelta
                 PlayerStats:updateStat(player, "thirst", -thirstDrain, true)
                 
                 -- Health regeneration/deterioration based on hunger and thirst levels
@@ -372,6 +363,20 @@ function PlayerStats.init()
         elseif action == "RESTORE_HUNGER" then
             local amount = args[1]
             PlayerStats:updateStat(player, "hunger", amount, true)
+        elseif action == "CONSUME_ITEM" then
+            local itemName = args[1]
+            if BalanceConfig and BalanceConfig.Consumables and BalanceConfig.Consumables[itemName] then
+                local data = BalanceConfig.Consumables[itemName]
+                if data.hunger and data.hunger ~= 0 then
+                    PlayerStats:updateStat(player, "hunger", data.hunger, true)
+                end
+                if data.thirst and data.thirst ~= 0 then
+                    PlayerStats:updateStat(player, "thirst", data.thirst, true)
+                end
+                if data.health and data.health ~= 0 then
+                    PlayerStats:updateStat(player, "health", data.health, true)
+                end
+            end
         elseif action == "RESTORE_THIRST" then
             local amount = args[1]
             PlayerStats:updateStat(player, "thirst", amount, true)
@@ -381,6 +386,12 @@ function PlayerStats.init()
         elseif action == "REMOVE_STATUS_EFFECT" then
             local effectName = args[1]
             PlayerStats:removeStatusEffect(player, effectName)
+        elseif action == "REQUEST_STATS" then
+            if PlayerStats.playerStats[player] then
+                statsRemoteEvent:FireClient(player, "INITIAL_STATS", PlayerStats.playerStats[player])
+            else
+                initializePlayerStats(player)
+            end
         end
     end)
 end

@@ -27,25 +27,27 @@ local WEAPONS = {
     ["WoodenStick"] = {
         type = "melee",
         displayName = "Wooden Stick",
-        damage = 15,
-        attackSpeed = 0.6, -- seconds between attacks
+        damage = 8,
+        attackSpeed = 0.6, 
         range = 5,
         durability = 20,
         rarity = "common",
         description = "A basic wooden stick. Fast but weak.",
         model = {
-            handleSize = Vector3.new(0.3, 3.5, 0.3), -- Thin stick
+            -- Blocky fallback is reliable
+            handleSize = Vector3.new(0.2, 3.5, 0.2), 
             handleColor = Color3.fromRGB(139, 90, 43),
             handleMaterial = Enum.Material.Wood,
-            bladeSize = nil,
-            bladeColor = nil
+            bladeSize = Vector3.new(0.1, 0.5, 0.1), -- Tiny nub for detail
+            bladeColor = Color3.fromRGB(100, 60, 30),
+            bladeOffset = Vector3.new(0.1, 1, 0)
         }
     },
     
     ["SharpStick"] = {
         type = "melee",
         displayName = "Sharp Stick",
-        damage = 25,
+        damage = 15,
         attackSpeed = 0.8,
         range = 6,
         durability = 15,
@@ -55,18 +57,19 @@ local WEAPONS = {
         statusChance = 0.10,
         statusDuration = 5,
         model = {
-            handleSize = Vector3.new(0.4, 5, 0.4), -- Thicker for visibility
+            meshId = "rbxassetid://121944778", -- Classic Dagger Mesh (Reliable)
+            scale = Vector3.new(0.7, 3.0, 0.7), -- Stretched to look like a spear
+            textureId = "rbxassetid://121944805", -- Classic Texture
+            handleSize = Vector3.new(0.3, 5, 0.3),
             handleColor = Color3.fromRGB(120, 80, 40),
-            handleMaterial = Enum.Material.Wood,
-            tipSize = Vector3.new(0.3, 1, 0.3), -- Bigger tip
-            tipColor = Color3.fromRGB(100, 100, 110) -- Metal gray
+            handleMaterial = Enum.Material.Wood
         }
     },
     
     ["StoneKnife"] = {
         type = "melee",
         displayName = "Stone Knife",
-        damage = 20,
+        damage = 12,
         attackSpeed = 0.5,
         range = 4,
         durability = 25,
@@ -76,12 +79,13 @@ local WEAPONS = {
         statusChance = 0.15,
         statusDuration = 5,
         model = {
-            handleSize = Vector3.new(0.2, 1.2, 0.2),
-            handleColor = Color3.fromRGB(139, 90, 43),
-            handleMaterial = Enum.Material.Wood,
-            bladeSize = Vector3.new(0.15, 1.5, 0.4),
-            bladeColor = Color3.fromRGB(100, 100, 100),
-            bladeMaterial = Enum.Material.Slate
+            meshId = "rbxassetid://121944778", -- Classic Dagger Mesh
+            scale = Vector3.new(1, 1, 1),
+            textureId = "rbxassetid://121944805",
+            handleSize = Vector3.new(0.5, 2, 0.5),
+            handleColor = Color3.fromRGB(100, 100, 100),
+            handleMaterial = Enum.Material.Slate,
+            rotation = Vector3.new(0, -90, 0) -- Orient correctly
         }
     },
     
@@ -199,10 +203,11 @@ local WEAPONS = {
         durability = 30,
         rarity = "common",
         description = "A simple slingshot. Long range, low damage.",
-        ammoType = "rock",
+        ammoType = "SlingshotAmmo",
         ammoPerShot = 1,
         model = {
-            handleSize = Vector3.new(0.3, 2, 0.3),
+            -- Blocky fallback
+            handleSize = Vector3.new(0.3, 1.5, 0.3),
             handleColor = Color3.fromRGB(139, 90, 43),
             handleMaterial = Enum.Material.Wood
         }
@@ -218,13 +223,15 @@ local WEAPONS = {
         durability = 20,
         rarity = "uncommon",
         description = "A hunting bow. High damage with arrow arc.",
-        ammoType = "arrow",
+        ammoType = "Arrow",
         ammoPerShot = 1,
         chargeTime = 0.5, -- seconds to fully charge
         statusEffect = "BLEEDING",
         statusChance = 0.20,
         statusDuration = 6,
         model = {
+            meshId = "rbxassetid://471832062", -- Classic Bow Mesh
+            scale = Vector3.new(2, 2, 2),
             bowSize = Vector3.new(0.15, 4, 0.5),
             bowColor = Color3.fromRGB(100, 70, 40),
             bowMaterial = Enum.Material.Wood
@@ -242,7 +249,11 @@ local WEAPONS = {
         rarity = "uncommon",
         stackSize = 5,
         description = "A balanced throwing knife. Fast and accurate.",
+        ammoType = "knife",
         model = {
+            meshId = "rbxassetid://121944778", -- Classic Dagger
+            scale = Vector3.new(0.6, 0.6, 0.6),
+            textureId = "rbxassetid://121944805",
             bladeSize = Vector3.new(0.1, 2, 0.3),
             bladeColor = Color3.fromRGB(150, 150, 160),
             bladeMaterial = Enum.Material.Metal
@@ -297,82 +308,146 @@ local WEAPONS = {
 
 -- ============ WEAPON MODEL CREATION ============
 
+local function getWeaponColor(weaponId)
+    if string.find(weaponId, "Stone") then return Enum.Material.Slate, Color3.fromRGB(100, 100, 100) end
+    if string.find(weaponId, "Iron") or string.find(weaponId, "Machete") then return Enum.Material.Metal, Color3.fromRGB(150, 150, 160) end
+    if string.find(weaponId, "Ice") then return Enum.Material.Ice, Color3.fromRGB(180, 230, 255) end
+    if string.find(weaponId, "Obsidian") then return Enum.Material.Rock, Color3.fromRGB(20, 10, 10) end
+    return Enum.Material.Wood, Color3.fromRGB(139, 90, 43) -- Default Wood
+end
+
 local function createMeleeWeaponModel(weaponId, weaponDef)
     local weapon = Instance.new("Tool")
     weapon.Name = weaponId
     weapon.RequiresHandle = true
     weapon.CanBeDropped = true
     
-    -- Create handle
+    local material, mainColor = getWeaponColor(weaponId)
+    
+    -- 1. HANDLE (Base)
     local handle = Instance.new("Part")
     handle.Name = "Handle"
-    handle.Size = weaponDef.model.handleSize or Vector3.new(0.3, 3, 0.3)
-    handle.Color = weaponDef.model.handleColor or Color3.fromRGB(139, 90, 43)
-    handle.Material = weaponDef.model.handleMaterial or Enum.Material.Wood
+    handle.Material = Enum.Material.Wood -- Handles are usually wood
+    handle.Color = Color3.fromRGB(120, 90, 50)
+    handle.Size = Vector3.new(0.3, 1, 0.3)
     handle.CanCollide = false
     handle.Massless = true
     handle.Parent = weapon
     
-    -- Create blade if exists
-    if weaponDef.model.bladeSize then
-        local blade = Instance.new("Part")
-        blade.Name = "Blade"
-        blade.Size = weaponDef.model.bladeSize
-        blade.Color = weaponDef.model.bladeColor or Color3.fromRGB(150, 150, 160)
-        blade.Material = weaponDef.model.bladeMaterial or Enum.Material.Metal
-        blade.CanCollide = false
-        blade.Massless = true
-        blade.Parent = weapon
+    -- 2. PROCEDURAL BLADE/HEAD CONSTRUCTION
+    if weaponId == "WoodenStick" then
+        handle.Size = Vector3.new(0.25, 3.8, 0.25)
+        handle.Material = Enum.Material.Wood
+        handle.Shape = Enum.PartType.Cylinder
+        handle.CFrame = handle.CFrame * CFrame.Angles(0, 0, math.rad(90))
         
-        -- Weld blade to handle
-        local weld = Instance.new("Weld")
-        weld.Part0 = handle
-        weld.Part1 = blade
-        local offset = weaponDef.model.bladeOffset or Vector3.new(0, handle.Size.Y / 2 + blade.Size.Y / 2, 0)
-        weld.C0 = CFrame.new(offset)
-        weld.Parent = blade
-    end
-    
-    -- Create tip if exists (for spears) - make it look pointed
-    if weaponDef.model.tipSize then
+        -- Make it look like a natural branch
+        local mainBranch = Instance.new("Part")
+        mainBranch.Size = Vector3.new(0.15, 1.2, 0.15) 
+        mainBranch.Color = handle.Color
+        mainBranch.Material = handle.Material
+        mainBranch.CanCollide = false
+        mainBranch.Parent = weapon
+        local w1 = Instance.new("Weld", mainBranch)
+        w1.Part0 = handle
+        w1.Part1 = mainBranch
+        w1.C0 = CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(35))
+        
+        local smallBranch = Instance.new("Part")
+        smallBranch.Size = Vector3.new(0.1, 0.6, 0.1)
+        smallBranch.Color = handle.Color
+        smallBranch.Material = handle.Material
+        smallBranch.CanCollide = false
+        smallBranch.Parent = weapon
+        local w2 = Instance.new("Weld", smallBranch)
+        w2.Part0 = handle
+        w2.Part1 = smallBranch
+        w2.C0 = CFrame.new(0, -0.5, 0) * CFrame.Angles(0, math.rad(90), math.rad(-25))
+        
+    elseif weaponId == "SharpStick" or weaponId == "BambooSpear" then
+        handle.Size = Vector3.new(0.3, 6, 0.3) -- Long shaft
+        handle.Shape = Enum.PartType.Cylinder
+        
+        -- Tip
         local tip = Instance.new("Part")
-        tip.Name = "Tip"
-        tip.Size = Vector3.new(0.4, 1.5, 0.4) -- Bigger visible tip
-        tip.Color = Color3.fromRGB(120, 120, 130) -- Metal gray
+        tip.Size = Vector3.new(0.4, 1.5, 0.4)
+        tip.Color = Color3.fromRGB(200, 200, 200)
         tip.Material = Enum.Material.Metal
         tip.CanCollide = false
-        tip.Massless = true
         tip.Parent = weapon
         
-        -- Use wedge mesh for pointed look like a spear head
+        -- Make tip cone-ish using SpecialMesh
         local mesh = Instance.new("SpecialMesh")
-        mesh.MeshType = Enum.MeshType.Wedge
-        mesh.Scale = Vector3.new(1, 1, 1)
+        mesh.MeshType = Enum.MeshType.FileMesh
+        mesh.MeshId = "rbxassetid://1033714" -- Classic Cone Mesh (Native to Roblox)
+        mesh.Scale = Vector3.new(0.3, 1.5, 0.3)
         mesh.Parent = tip
         
-        local weld = Instance.new("Weld")
-        weld.Part0 = handle
-        weld.Part1 = tip
-        -- Position at top of handle, rotated to point up
-        weld.C0 = CFrame.new(0, handle.Size.Y / 2 + 0.6, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-        weld.Parent = tip
+        local w = Instance.new("Weld", tip)
+        w.Part0 = handle
+        w.Part1 = tip
+        w.C0 = CFrame.new(0, 3, 0) 
+        
+    elseif weaponId == "StoneKnife" or weaponId == "Machete" or weaponId == "IceSword" then
+        handle.Size = Vector3.new(0.3, 1.2, 0.3)
+        
+        local blade = Instance.new("Part")
+        blade.Size = Vector3.new(0.1, 2.5, 0.5)
+        blade.Color = mainColor
+        blade.Material = material
+        blade.CanCollide = false
+        blade.Parent = weapon
+        
+        -- Bevel blade with wedge if needed, or just block for reliability
+        local w = Instance.new("Weld", blade)
+        w.Part0 = handle
+        w.Part1 = blade
+        w.C0 = CFrame.new(0, 1.8, 0)
+        
+    elseif weaponId == "HandmadeAxe" or weaponId == "ObsidianAxe" then
+        handle.Size = Vector3.new(0.3, 3.5, 0.3)
+        
+        local head = Instance.new("Part")
+        head.Size = Vector3.new(1.5, 0.8, 0.5)
+        head.Color = mainColor
+        head.Material = material
+        head.CanCollide = false
+        head.Parent = weapon
+        
+        local w = Instance.new("Weld", head)
+        w.Part0 = handle
+        w.Part1 = head
+        w.C0 = CFrame.new(0, 1.5, 0)
+        
+        local edge = Instance.new("Part")
+        edge.Size = Vector3.new(0.2, 1, 0.5)
+        edge.Color = Color3.new(0.8, 0.8, 0.8) -- Sharpened edge
+        edge.Parent = weapon
+        local w2 = Instance.new("Weld", edge)
+        w2.Part0 = head
+        w2.Part1 = edge
+        w2.C0 = CFrame.new(0.8, 0, 0)
     end
     
-    -- Store weapon data as attributes
+    -- Fix Grip (Hold at bottom of handle)
+    local gripY = -handle.Size.Y/2 + 0.5
+    weapon.Grip = CFrame.new(0, gripY, 0)
+    
+    -- Physics Cleanup
+    for _, part in pairs(weapon:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Massless = true
+            part.CanCollide = false
+            part.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
+        end
+    end
+    
+    -- Attributes
     weapon:SetAttribute("WeaponId", weaponId)
+    weapon:SetAttribute("Type", weaponDef.type)
     weapon:SetAttribute("Damage", weaponDef.damage)
     weapon:SetAttribute("Range", weaponDef.range)
     weapon:SetAttribute("AttackSpeed", weaponDef.attackSpeed)
-    weapon:SetAttribute("Durability", weaponDef.durability)
-    weapon:SetAttribute("CurrentDurability", weaponDef.durability)
-    weapon:SetAttribute("Type", weaponDef.type)
-    weapon:SetAttribute("Rarity", weaponDef.rarity)
-    
-    if weaponDef.statusEffect then
-        weapon:SetAttribute("StatusEffect", weaponDef.statusEffect)
-        weapon:SetAttribute("StatusChance", weaponDef.statusChance)
-        weapon:SetAttribute("StatusDuration", weaponDef.statusDuration)
-    end
     
     return weapon
 end
@@ -383,71 +458,149 @@ local function createRangedWeaponModel(weaponId, weaponDef)
     weapon.RequiresHandle = true
     weapon.CanBeDropped = true
     
-    -- Create handle (bow body)
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    
-    if weaponDef.model.bowSize then
-        handle.Size = weaponDef.model.bowSize
-        handle.Color = weaponDef.model.bowColor
-        handle.Material = weaponDef.model.bowMaterial
+    if weaponId == "Slingshot" then
+        -- SLINGSHOT CONSTRUCTION
+        local handle = Instance.new("Part")
+        handle.Name = "Handle"
+        handle.Size = Vector3.new(0.4, 1.5, 0.4)
+        handle.Material = Enum.Material.Wood
+        handle.Color = Color3.fromRGB(139, 90, 43)
+        handle.CanCollide = false
+        handle.Massless = true
+        handle.Parent = weapon
+        
+        -- Y-Shape Forks
+        local leftFork = Instance.new("Part")
+        leftFork.Size = Vector3.new(0.2, 0.8, 0.2)
+        leftFork.Color = handle.Color
+        leftFork.Material = handle.Material
+        leftFork.CanCollide = false
+        leftFork.Parent = weapon
+        local w1 = Instance.new("Weld", leftFork)
+        w1.Part0 = handle
+        w1.Part1 = leftFork
+        w1.C0 = CFrame.new(-0.3, 0.8, 0) * CFrame.Angles(0, 0, math.rad(30))
+        
+        local rightFork = Instance.new("Part")
+        rightFork.Size = Vector3.new(0.2, 0.8, 0.2)
+        rightFork.Color = handle.Color
+        rightFork.Material = handle.Material
+        rightFork.CanCollide = false
+        rightFork.Parent = weapon
+        local w2 = Instance.new("Weld", rightFork)
+        w2.Part0 = handle
+        w2.Part1 = rightFork
+        w2.C0 = CFrame.new(0.3, 0.8, 0) * CFrame.Angles(0, 0, math.rad(-30))
+        
+        -- Rubber Band
+        local band = Instance.new("Part")
+        band.Size = Vector3.new(0.8, 0.1, 0.1)
+        band.Color = Color3.fromRGB(50, 50, 50)
+        band.Material = Enum.Material.Fabric
+        band.CanCollide = false
+        band.Parent = weapon
+        local w3 = Instance.new("Weld", band)
+        w3.Part0 = handle
+        w3.Part1 = band
+        w3.C0 = CFrame.new(0, 1.2, 0)
+        
+        -- Grip adjustment
+        weapon.Grip = CFrame.new(0, -0.5, 0)
+        
     else
-        handle.Size = weaponDef.model.handleSize
-        handle.Color = weaponDef.model.handleColor
-        handle.Material = weaponDef.model.handleMaterial
+        -- BOW CONSTRUCTION (Default)
+        local handle = Instance.new("Part")
+        handle.Name = "Handle"
+        handle.Size = Vector3.new(0.3, 1.5, 0.3)
+        handle.Material = Enum.Material.Wood
+        handle.Color = Color3.fromRGB(100, 60, 20)
+        handle.CanCollide = false
+        handle.Massless = true
+        handle.Parent = weapon
+        
+        -- Top Limb
+        local topLimb = Instance.new("Part")
+        topLimb.Size = Vector3.new(0.2, 2, 0.2)
+        topLimb.Color = handle.Color
+        topLimb.Material = handle.Material
+        topLimb.CanCollide = false
+        topLimb.Parent = weapon
+        local w1 = Instance.new("Weld", topLimb)
+        w1.Part0 = handle
+        w1.Part1 = topLimb
+        w1.C0 = CFrame.new(0, 1.5, 0.5) * CFrame.Angles(math.rad(20), 0, 0)
+        
+        -- Bottom Limb
+        local botLimb = Instance.new("Part")
+        botLimb.Size = Vector3.new(0.2, 2, 0.2)
+        botLimb.Color = handle.Color
+        botLimb.Material = handle.Material
+        botLimb.CanCollide = false
+        botLimb.Parent = weapon
+        local w2 = Instance.new("Weld", botLimb)
+        w2.Part0 = handle
+        w2.Part1 = botLimb
+        w2.C0 = CFrame.new(0, -1.5, 0.5) * CFrame.Angles(math.rad(-20), 0, 0)
+        
+        -- String
+        local bowString = Instance.new("Part")
+        bowString.Size = Vector3.new(0.05, 4.5, 0.05)
+        bowString.Color = Color3.new(1,1,1)
+        bowString.Material = Enum.Material.Fabric
+        bowString.CanCollide = false
+        bowString.Parent = weapon
+        local w3 = Instance.new("Weld", bowString)
+        w3.Part0 = handle
+        w3.Part1 = bowString
+        w3.C0 = CFrame.new(0, 0, 1.2)
+        
+        -- Bow Grip Adjustment (Rotated to face forward)
+        weapon.Grip = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(-90), 0)
     end
     
-    handle.CanCollide = false
-    handle.Massless = true
-    handle.Parent = weapon
-    
-    -- Store weapon data
+    -- Attributes
     weapon:SetAttribute("WeaponId", weaponId)
-    weapon:SetAttribute("Damage", weaponDef.damage)
-    weapon:SetAttribute("Range", weaponDef.range)
-    weapon:SetAttribute("ProjectileSpeed", weaponDef.projectileSpeed)
-    weapon:SetAttribute("AttackSpeed", weaponDef.attackSpeed)
-    weapon:SetAttribute("Durability", weaponDef.durability)
-    weapon:SetAttribute("CurrentDurability", weaponDef.durability)
     weapon:SetAttribute("Type", weaponDef.type)
-    weapon:SetAttribute("Rarity", weaponDef.rarity)
+    weapon:SetAttribute("Damage", weaponDef.damage)
+    weapon:SetAttribute("ProjectileSpeed", weaponDef.projectileSpeed)
     weapon:SetAttribute("AmmoType", weaponDef.ammoType)
-    
-    if weaponDef.chargeTime then
-        weapon:SetAttribute("ChargeTime", weaponDef.chargeTime)
+    if weaponDef.chargeTime then weapon:SetAttribute("ChargeTime", weaponDef.chargeTime) end
+
+    -- Physics Cleanup
+    for _, part in pairs(weapon:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Massless = true
+            part.CanCollide = false
+            part.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
+        end
     end
-    
+
     return weapon
 end
 
 local function createThrownWeaponModel(weaponId, weaponDef)
-    local weapon = Instance.new("Tool")
+    -- Just reuse Melee Knife model but smaller
+    local weapon = createMeleeWeaponModel("StoneKnife", weaponDef)
     weapon.Name = weaponId
-    weapon.RequiresHandle = true
-    weapon.CanBeDropped = true
     
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = weaponDef.model.bladeSize or Vector3.new(0.1, 2, 0.3)
-    handle.Color = weaponDef.model.bladeColor or Color3.fromRGB(150, 150, 160)
-    handle.Material = weaponDef.model.bladeMaterial or Enum.Material.Metal
-    handle.CanCollide = false
-    handle.Massless = true
-    handle.Parent = weapon
+    local h = weapon:FindFirstChild("Handle")
+    if h then
+        h.Size = h.Size * 0.6 -- Smaller
+    end
     
+    -- Attributes (CRITICAL: Must set ALL ranged attributes or projectile fails)
     weapon:SetAttribute("WeaponId", weaponId)
+    weapon:SetAttribute("Type", "thrown") -- Override melee type from base model
     weapon:SetAttribute("Damage", weaponDef.damage)
     weapon:SetAttribute("Range", weaponDef.range)
     weapon:SetAttribute("ProjectileSpeed", weaponDef.projectileSpeed)
-    weapon:SetAttribute("AttackSpeed", weaponDef.attackSpeed)
-    weapon:SetAttribute("Type", weaponDef.type)
-    weapon:SetAttribute("Rarity", weaponDef.rarity)
-    weapon:SetAttribute("StackSize", weaponDef.stackSize or 1)
+    weapon:SetAttribute("AmmoType", weaponDef.ammoType)
+    if weaponDef.chargeTime then weapon:SetAttribute("ChargeTime", weaponDef.chargeTime) end
     
     return weapon
 end
 
--- ============ WEAPON CREATION ============
+-- ============ WEAPON CREATION ENTRY POINT ============
 
 function WeaponSystem:createWeapon(weaponId)
     local weaponDef = WEAPONS[weaponId]
@@ -465,7 +618,7 @@ function WeaponSystem:createWeapon(weaponId)
     elseif weaponDef.type == "thrown" then
         weapon = createThrownWeaponModel(weaponId, weaponDef)
     else
-        -- Traps and baits
+        -- Fallback
         weapon = createMeleeWeaponModel(weaponId, weaponDef)
         weapon:SetAttribute("Type", weaponDef.type)
     end
@@ -610,8 +763,8 @@ function WeaponSystem:processRangedAttack(player, direction, chargeAmount)
     if not equippedTool then return end
     
     local damage = equippedTool:GetAttribute("Damage") or 10
-    local projectileSpeed = equippedTool:GetAttribute("ProjectileSpeed") or 100
-    local range = equippedTool:GetAttribute("Range") or 50
+    local projectileSpeed = equippedTool:GetAttribute("ProjectileSpeed") or 120 -- Increased default
+    local range = equippedTool:GetAttribute("Range") or 80
     local weaponId = equippedTool:GetAttribute("WeaponId")
     local ammoType = equippedTool:GetAttribute("AmmoType")
     
@@ -619,6 +772,35 @@ function WeaponSystem:processRangedAttack(player, direction, chargeAmount)
     chargeAmount = math.clamp(chargeAmount or 1, 0.3, 1)
     local actualDamage = damage * chargeAmount
     local actualSpeed = projectileSpeed * chargeAmount
+    
+    -- Check for ammo (Ranged Weapons)
+    local weaponType = equippedTool:GetAttribute("Type")
+    
+    if weaponType == "ranged" and ammoType then
+        -- Get InventoryController
+        local success, InventoryController = pcall(function()
+            return require(script.Parent.InventoryController)
+        end)
+        
+        if success and InventoryController then
+            local ammoCount = InventoryController:getItemCount(player, ammoType)
+            if ammoCount < 1 then
+                -- No ammo - play click sound and fail
+                -- weaponSystemRemote:FireClient(player, "NO_AMMO") -- Optional feedback
+                return
+            end
+            
+            -- Consume ammo
+            InventoryController:removeItem(player, ammoType, 1)
+        end
+    end
+    
+    -- Handle Thrown Weapons (Consume the weapon itself)
+    if weaponType == "thrown" then
+        -- Force destroy weapon regardless of durability setting
+        equippedTool:Destroy()
+        -- Note: If we had stacking, we would reduce stack here. Currently 1 tool = 1 throw.
+    end
     
     -- Update cooldown
     WeaponSystem.weaponCooldowns[player] = tick()
@@ -639,30 +821,61 @@ end
 function WeaponSystem:createProjectile(player, origin, direction, speed, damage, maxRange, projectileType)
     local projectile = Instance.new("Part")
     projectile.Name = "Projectile"
-    projectile.Size = Vector3.new(0.2, 0.2, 1.5)
-    projectile.Color = Color3.fromRGB(100, 70, 40)
-    projectile.Material = Enum.Material.Wood
+    projectile.Size = Vector3.new(1, 1, 3) -- Much BIGGER HITBOX
+    projectile.Transparency = 1 -- Invisible hitbox
     projectile.CanCollide = false
     projectile.Anchored = false
-    projectile.Position = origin + direction.Unit * 2
+    projectile.Position = origin + direction.Unit * 3 + Vector3.new(0, 1, 0) -- Spawn slightly higher/forward
     projectile.CFrame = CFrame.lookAt(projectile.Position, projectile.Position + direction)
+    projectile.Massless = true
     projectile.Parent = workspace
     
-    -- Arrow appearance
-    if projectileType == "arrow" then
+    -- Visual Mesh
+    local visual
+    if projectileType == "rock" or projectileType == "SlingshotAmmo" then
+        -- Rock Visual
+        visual = Instance.new("Part")
+        visual.Size = Vector3.new(0.5, 0.5, 0.5)
+        visual.Color = Color3.fromRGB(80, 80, 80)
+        visual.Material = Enum.Material.Slate
+        visual.Shape = Enum.PartType.Ball
+        visual.CanCollide = false
+        visual.Massless = true
+        visual.Parent = projectile
+        
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = projectile
+        weld.Part1 = visual
+        weld.Parent = projectile
+    else
+        -- Arrow Visual (Default)
+        visual = Instance.new("Part")
+        visual.Size = Vector3.new(0.2, 0.2, 2.5)
+        visual.Color = Color3.fromRGB(139, 90, 43)
+        visual.Material = Enum.Material.Wood
+        visual.CanCollide = false
+        visual.Massless = true
+        visual.Parent = projectile
+        
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = projectile
+        weld.Part1 = visual
+        weld.Parent = projectile
+        
+        -- Visual Tip
         local tip = Instance.new("Part")
-        tip.Size = Vector3.new(0.15, 0.3, 0.15)
-        tip.Color = Color3.fromRGB(80, 80, 80)
+        tip.Size = Vector3.new(0.3, 0.3, 0.5)
+        tip.Color = Color3.fromRGB(150, 150, 150)
         tip.Material = Enum.Material.Metal
         tip.CanCollide = false
         tip.Massless = true
         tip.Parent = projectile
         
-        local weld = Instance.new("Weld")
-        weld.Part0 = projectile
-        weld.Part1 = tip
-        weld.C0 = CFrame.new(0, 0, -0.9)
-        weld.Parent = tip
+        local tipWeld = Instance.new("Weld")
+        tipWeld.Part0 = visual
+        tipWeld.Part1 = tip
+        tipWeld.C0 = CFrame.new(0, 0, -1.2)
+        tipWeld.Parent = tip
     end
     
     -- Apply velocity
@@ -671,77 +884,76 @@ function WeaponSystem:createProjectile(player, origin, direction, speed, damage,
     bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bodyVelocity.Parent = projectile
     
-    -- Add gravity for arrows
-    if projectileType == "arrow" then
-        task.delay(0.2, function()
-            if projectile and projectile.Parent then
-                bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
-                projectile.Anchored = false
+    -- Gravity arc (simulated by reducing Y force over time)
+    if projectileType == "arrow" or projectileType == "rock" or projectileType == "SlingshotAmmo" or projectileType == "knife" then
+        task.delay(0.5, function() -- Increased to 0.5s for better range
+            if projectile and projectile.Parent and bodyVelocity.Parent then
+                bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge) -- Let gravity take Y
             end
         end)
     end
     
     -- Track projectile
-    local startPos = origin
-    local hit = false
+    local startPos = projectile.Position
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = {player.Character, projectile}
     
     local connection
+    
     connection = RunService.Heartbeat:Connect(function()
         if not projectile or not projectile.Parent then
             connection:Disconnect()
             return
         end
         
-        local distance = (projectile.Position - startPos).Magnitude
+        local currentPos = projectile.Position
+        local distance = (currentPos - startPos).Magnitude
         if distance > maxRange then
             connection:Disconnect()
             projectile:Destroy()
             return
         end
         
-        -- Check for collision
-        local rayResult = workspace:Raycast(
-            projectile.Position,
-            projectile.CFrame.LookVector * 2,
-            RaycastParams.new()
-        )
-        
+        -- Spherecast for better collision thickness
+        local fwd = projectile.CFrame.LookVector
+        local rayResult = workspace:Spherecast(currentPos, 1.5, fwd * 4, rayParams) -- 1.5 stud radius
+
         if rayResult then
-            connection:Disconnect()
-            
             local hitPart = rayResult.Instance
-            local hitPlayer = Players:GetPlayerFromCharacter(hitPart.Parent)
             
-            if hitPlayer and hitPlayer ~= player then
-                -- We hit a player
-                local targetChar = hitPlayer.Character
-                if targetChar then
-                    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
-                    local hitPos = targetHrp and targetHrp.Position or rayResult.Position
+            -- Valid hit? (Solid object or humanoid part)
+            if hitPart.CanCollide or hitPart.Parent:FindFirstChild("Humanoid") or hitPart.Parent.Parent:FindFirstChild("Humanoid") then
+                -- print("[WeaponSystem] Hit: " .. hitPart.Name) -- Commented out debug
                     
-                    -- Create fake tool for damage application
-                    local fakeWeapon = Instance.new("Tool")
-                    fakeWeapon:SetAttribute("Damage", damage)
-                    fakeWeapon:SetAttribute("StatusEffect", "BLEEDING")
-                    fakeWeapon:SetAttribute("StatusChance", 0.2)
-                    fakeWeapon:SetAttribute("StatusDuration", 5)
+                    connection:Disconnect()
                     
-                    WeaponSystem:applyDamage(player, hitPlayer, fakeWeapon, hitPos)
-                    fakeWeapon:Destroy()
-                end
-            end
-            
-            -- Stick arrow in place
-            projectile.Anchored = true
-            projectile.Position = rayResult.Position
-            Debris:AddItem(projectile, 10)
-            
-            weaponSystemRemote:FireAllClients("PROJECTILE_HIT", rayResult.Position, hitPlayer ~= nil and "player" or "environment")
+                    -- Check for character/humanoid hit
+                    local hitChar = hitPart.Parent
+                    local hitHumanoid = hitChar:FindFirstChild("Humanoid") or (hitChar.Parent and hitChar.Parent:FindFirstChild("Humanoid"))
+                    
+                    if hitHumanoid then
+                        hitChar = hitHumanoid.Parent
+                        local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
+                        
+                        -- Apply damage (Filter handles self-hit)
+                        WeaponSystem:applyDamage(player, hitChar, {GetAttribute = function(s, a) return (a=="Damage" and damage) or nil end}, currentPos) 
+                    end
+                    
+                    -- Visual stick effect
+                    projectile.Anchored = true
+                    if bodyVelocity then bodyVelocity:Destroy() end
+                    
+                    -- Simple "embed" visual
+                    projectile.CFrame = CFrame.lookAt(rayResult.Position, rayResult.Position + fwd)
+                    
+                    Debris:AddItem(projectile, 5)
+                    return
+             end
         end
     end)
     
-    -- Cleanup after max time
-    Debris:AddItem(projectile, maxRange / speed + 5)
+    Debris:AddItem(projectile, 8) -- Failsafe cleanup
     
     return projectile
 end
@@ -767,16 +979,18 @@ function WeaponSystem:applyDamage(attacker, target, weapon, hitPosition)
         damage = damage * critMultiplier
     end
     
-    -- Apply damage via PlayerStats
+    -- Apply damage via PlayerStats if it's a player
     local psSuccess, PlayerStats = pcall(function()
         return require(script.Parent.PlayerStats)
     end)
     
-    if psSuccess and PlayerStats then
-        PlayerStats:applyDamage(target, damage, weapon:GetAttribute("WeaponId") or "Unknown")
+    local targetPlayer = Players:GetPlayerFromCharacter(target)
+    
+    if targetPlayer and psSuccess and PlayerStats then
+        PlayerStats:applyDamage(targetPlayer, damage, weapon:GetAttribute("WeaponId") or "Unknown")
     else
-        -- Fallback: directly damage humanoid
-        local humanoid = target.Character and target.Character:FindFirstChild("Humanoid")
+        -- Fallback: directly damage humanoid (NPCs, Bots, or if PlayerStats fails)
+        local humanoid = target:FindFirstChild("Humanoid") or (target.Parent and target.Parent:FindFirstChild("Humanoid"))
         if humanoid then
             humanoid:TakeDamage(damage)
         end
@@ -1036,6 +1250,8 @@ function WeaponSystem.init()
             end
             
         elseif action == "RANGED_ATTACK" then
+            local direction = args[1]
+            local charge = args[2]
             local direction = args[1]
             local charge = args[2]
             if direction then

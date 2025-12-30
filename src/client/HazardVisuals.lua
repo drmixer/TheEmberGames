@@ -1,6 +1,6 @@
 -- LocalScript: HazardVisuals.lua
 -- Handles visual effects for Gamemaker hazard events
--- Creates flood, wildfire, and poison fog visual effects
+-- Creates acid rain, wildfire, and poison fog visual effects
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,10 +23,9 @@ HazardVisuals.warningFrame = nil
 
 -- Configuration
 local CONFIG = {
-    -- Flood settings
-    FLOOD_WATER_COLOR = Color3.fromRGB(30, 80, 120),
-    FLOOD_RISE_SPEED = 2, -- Studs per second
-    FLOOD_MAX_HEIGHT = 15,
+    -- Acid Rain settings
+    ACID_RAIN_COLOR = Color3.fromRGB(180, 255, 100),
+    ACID_RAIN_DENSITY = 50,
     
     -- Wildfire settings
     FIRE_COLOR_PRIMARY = Color3.fromRGB(255, 100, 20),
@@ -44,7 +43,7 @@ local CONFIG = {
 
 -- Sound IDs
 local SOUND_IDS = {
-    FLOOD_RISING = "rbxassetid://6677464267",
+    ACID_RAIN = "rbxassetid://9114249095", -- Reusing poison hiss for acid burn/hiss
     FIRE_CRACKLING = "rbxassetid://9114243671",
     POISON_HISS = "rbxassetid://9114249095",
     HAZARD_WARNING = "rbxassetid://6895079853",
@@ -188,88 +187,85 @@ function HazardVisuals:showWarning(title, description, duration)
     end)
 end
 
--- ==================== FLOOD EFFECT ====================
+-- ==================== ACID RAIN EFFECT ====================
 
-function HazardVisuals:createFloodEffect(position, radius, duration)
-    print("[HazardVisuals] Creating flood effect at " .. tostring(position))
+function HazardVisuals:createAcidRainEffect(position, radius, duration)
+    print("[HazardVisuals] Creating ACID RAIN effect")
     
-    local hazardId = "flood_" .. tostring(tick())
+    local hazardId = "acid_rain_" .. tostring(tick())
     
     -- Show warning
-    HazardVisuals:showWarning("🌊 FLOOD WARNING", "Water is rising in this area! Seek high ground!", 5)
+    HazardVisuals:showWarning("⚠️ ACID RAIN", "Seek shelter! The rain is acidic!", 5)
     
-    -- Create water surface
-    local waterPart = Instance.new("Part")
-    waterPart.Name = "FloodWater"
-    waterPart.Size = Vector3.new(radius * 2, 1, radius * 2)
-    waterPart.Position = Vector3.new(position.X, position.Y - 5, position.Z) -- Start below ground
-    waterPart.Anchored = true
-    waterPart.CanCollide = false
-    waterPart.Material = Enum.Material.Glass
-    waterPart.Color = CONFIG.FLOOD_WATER_COLOR
-    waterPart.Transparency = 0.4
-    waterPart.Parent = workspace
+    -- Create atmosphere effect
+    local colorCorr = Instance.new("ColorCorrectionEffect")
+    colorCorr.Name = "AcidRainTint"
+    colorCorr.TintColor = Color3.fromRGB(200, 255, 180) -- Sickly green
+    colorCorr.Saturation = -0.2
+    colorCorr.Contrast = 0.1
+    colorCorr.Parent = Lighting
     
-    -- Add water texture/effect
-    local surfaceGui = Instance.new("SurfaceGui")
-    surfaceGui.Face = Enum.NormalId.Top
-    surfaceGui.Parent = waterPart
+    -- Create rain particle part attached to camera
+    local rainPart = Instance.new("Part")
+    rainPart.Name = "rainPart"
+    rainPart.Size = Vector3.new(100, 1, 100)
+    rainPart.Transparency = 1
+    rainPart.CanCollide = false
+    rainPart.Anchored = true
+    rainPart.Parent = workspace
     
-    -- Create wave pattern frame
-    local waveFrame = Instance.new("Frame")
-    waveFrame.Size = UDim2.new(1, 0, 1, 0)
-    waveFrame.BackgroundColor3 = Color3.fromRGB(100, 180, 220)
-    waveFrame.BackgroundTransparency = 0.5
-    waveFrame.Parent = surfaceGui
+    local rainEmitter = Instance.new("ParticleEmitter")
+    rainEmitter.Texture = "rbxassetid://241595494" -- Generic drop/streak
+    rainEmitter.Color = ColorSequence.new(CONFIG.ACID_RAIN_COLOR)
+    rainEmitter.Size = NumberSequence.new(0.5, 0.2)
+    rainEmitter.Transparency = NumberSequence.new(0.2, 0.8)
+    rainEmitter.Lifetime = NumberRange.new(1, 1.5)
+    rainEmitter.Speed = NumberRange.new(50, 70) -- Fast falling
+    rainEmitter.SpreadAngle = Vector2.new(0, 0)
+    rainEmitter.Acceleration = Vector3.new(0, -50, 0) -- Gravity
+    rainEmitter.Rate = 500 -- Heavy rain
+    rainEmitter.EmissionDirection = Enum.NormalId.Bottom
+    rainEmitter.Parent = rainPart
     
-    -- Play water sound
-    local waterSound = playSound(SOUND_IDS.FLOOD_RISING, 0.6, true, waterPart)
-    
-    -- Animate water rising
-    local riseConnection
+    -- Sound
+    local rainSound = playSound(SOUND_IDS.ACID_RAIN, 0.5, true, PlayerGui)
+
+    -- Animate rain following camera
+    local rainConnection
     local startTime = tick()
-    local startY = position.Y - 5
-    local targetY = position.Y + CONFIG.FLOOD_MAX_HEIGHT
     
-    riseConnection = RunService.Heartbeat:Connect(function(dt)
+    rainConnection = RunService.RenderStepped:Connect(function()
         local elapsed = tick() - startTime
         
         if elapsed >= duration then
-            riseConnection:Disconnect()
+            rainConnection:Disconnect()
             
-            -- Drain water
-            TweenService:Create(waterPart, TweenInfo.new(5), {
-                Position = Vector3.new(position.X, position.Y - 10, position.Z),
-                Transparency = 1
-            }):Play()
+            -- Fade out
+            TweenService:Create(colorCorr, TweenInfo.new(2), {TintColor = Color3.fromRGB(255, 255, 255), Saturation = 0, Contrast = 0}):Play()
+            rainEmitter.Enabled = false
+            TweenService:Create(rainSound, TweenInfo.new(2), {Volume = 0}):Play()
             
-            if waterSound then
-                TweenService:Create(waterSound, TweenInfo.new(3), {Volume = 0}):Play()
-            end
+            Debris:AddItem(colorCorr, 2)
+            Debris:AddItem(rainPart, 3)
+            Debris:AddItem(rainSound, 2)
             
-            Debris:AddItem(waterPart, 6)
             HazardVisuals.activeHazards[hazardId] = nil
             return
         end
         
-        -- Rise the water
-        local progress = elapsed / (duration * 0.3) -- Rise for first 30% of duration
-        progress = math.min(progress, 1)
-        
-        local currentY = startY + (targetY - startY) * progress
-        waterPart.Position = Vector3.new(position.X, currentY, position.Z)
-        
-        -- Wave animation
-        local waveOffset = math.sin(elapsed * 2) * 0.3
-        waterPart.Position = waterPart.Position + Vector3.new(0, waveOffset, 0)
+        -- Update rain position above camera
+        if Camera then
+            rainPart.CFrame = CFrame.new(Camera.CFrame.Position + Vector3.new(0, 30, 0))
+        end
     end)
     
     -- Store hazard reference
     HazardVisuals.activeHazards[hazardId] = {
-        type = "FLOOD",
-        part = waterPart,
-        sound = waterSound,
-        connection = riseConnection
+        type = "ACID_RAIN",
+        part = rainPart,
+        effect = colorCorr,
+        sound = rainSound,
+        connection = rainConnection
     }
     
     return hazardId
@@ -597,6 +593,10 @@ function HazardVisuals:cleanupHazard(hazardId)
         hazard.overlay:Destroy()
     end
     
+    if hazard.effect then
+        hazard.effect:Destroy()
+    end
+    
     HazardVisuals.activeHazards[hazardId] = nil
 end
 
@@ -623,8 +623,8 @@ function HazardVisuals.init()
                 local eventData = args[1]
                 if not eventData then return end
                 
-                if eventData.type == "FLOOD" then
-                    HazardVisuals:createFloodEffect(eventData.position, eventData.radius, eventData.duration)
+                if eventData.type == "ACID_RAIN" then
+                    HazardVisuals:createAcidRainEffect(eventData.position, eventData.radius, eventData.duration)
                 elseif eventData.type == "WILDFIRE" then
                     HazardVisuals:createWildfireEffect(eventData.position, eventData.radius, eventData.duration)
                 elseif eventData.type == "POISON_FOG" then

@@ -352,8 +352,8 @@ local function setupCamera(character, angleType, duration)
 end
 
 -- Play victory pose
-function VictoryPoses:playPose(poseId)
-    local character = Player.Character
+function VictoryPoses:playPose(poseId, targetCharacter)
+    local character = targetCharacter or Player.Character
     if not character then return false end
     
     local poseConfig = VICTORY_POSES[poseId]
@@ -368,12 +368,12 @@ function VictoryPoses:playPose(poseId)
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
     
-    print("[VictoryPoses] Playing pose: " .. poseConfig.name)
+    print("[VictoryPoses] Playing pose: " .. poseConfig.name .. " on " .. character.Name)
     
     -- Stop any current pose
     VictoryPoses:stopPose()
     
-    -- Play animation
+    -- Play animation (Client-side play on another character works and is visible locally)
     local animation = Instance.new("Animation")
     animation.AnimationId = poseConfig.animationId
     
@@ -393,7 +393,7 @@ function VictoryPoses:playPose(poseId)
         animation = animation
     }
     
-    -- Setup camera
+    -- Setup camera (Orbit the WINNER)
     VictoryPoses.poseConnection = setupCamera(character, poseConfig.cameraAngle, poseConfig.duration)
     
     -- Play effects
@@ -455,18 +455,26 @@ function VictoryPoses.init()
     print("[VictoryPoses] Initializing...")
     
     -- Connect to match events
-    local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
+    local matchRemote = ReplicatedStorage:WaitForChild("MatchRemoteEvent", 10)
     if matchRemote then
         matchRemote.OnClientEvent:Connect(function(eventType, ...)
             local args = {...}
             
-            if eventType == "VICTORY_SCREEN" then
-                local winnerData = args[1]
-                if winnerData and winnerData.userId == Player.UserId then
-                    -- Play the player's selected victory pose
-                    local selectedPose = Player:GetAttribute("SelectedVictoryPose") or VictoryPoses.selectedPose
-                    task.wait(1) -- Brief delay before pose
-                    VictoryPoses:playPose(selectedPose)
+            if eventType == "VICTORY_SEQUENCE" then
+                local data = args[1]
+                local winnerId = data.winnerId
+                
+                if winnerId then
+                    local winnerPlayer = Players:GetPlayerByUserId(winnerId)
+                    if winnerPlayer and winnerPlayer.Character then
+                         -- Everyone watches the winner
+                         -- Try to get their preferred pose (if replicated attribute exists), else default
+                         local poseId = winnerPlayer:GetAttribute("SelectedVictoryPose") or "triumphant"
+                         
+                         -- Delay slightly to allow UI to fade in
+                         task.wait(0.5)
+                         VictoryPoses:playPose(poseId, winnerPlayer.Character)
+                    end
                 end
             end
         end)

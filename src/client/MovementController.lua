@@ -89,10 +89,16 @@ function MovementController:startCrouching()
     MovementController.isCrouching = true
     local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
     if hum then
+        if not MovementController.originalHipHeight then
+            MovementController.originalHipHeight = hum.HipHeight -- Cache it
+        end
+        
         hum.WalkSpeed = CONFIG.CROUCH_SPEED
         hum.JumpPower = CONFIG.JUMP_POWER_CROUCH
-        hum.HipHeight = 0 -- Default is 2, 0 lowers char but might clip legs. 
-        TweenService:Create(hum, TweenInfo.new(0.3), {HipHeight = -0.5}):Play()
+        
+        -- Crouch behavior (Camera offset only since we lack animation)
+        -- This avoids clipping into the ground
+        TweenService:Create(hum, TweenInfo.new(0.3), {CameraOffset = Vector3.new(0, -1.5, 0)}):Play()
     end
 end
 
@@ -102,7 +108,8 @@ function MovementController:stopCrouching()
     if hum then
         hum.WalkSpeed = CONFIG.WALK_SPEED
         hum.JumpPower = CONFIG.JUMP_POWER_NORMAL
-        TweenService:Create(hum, TweenInfo.new(0.3), {HipHeight = 0}):Play()
+        
+        TweenService:Create(hum, TweenInfo.new(0.3), {CameraOffset = Vector3.new(0, 0, 0)}):Play()
     end
 end
 
@@ -197,6 +204,7 @@ function MovementController.init()
     Player.CharacterAdded:Connect(function(char)
         MovementController.isSprinting = false
         MovementController.isCrouching = false
+        MovementController.originalHipHeight = nil
         MovementController.stamina = CONFIG.STAMINA_MAX
     end)
 end

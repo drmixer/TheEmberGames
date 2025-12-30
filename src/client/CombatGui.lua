@@ -26,48 +26,9 @@ local function createCombatUI()
     screenGui.Name = "CombatInterface"
     screenGui.Parent = PlayerGui
     
-    -- Weapon Selection Bar
-    local weaponBar = Instance.new("Frame")
-    weaponBar.Name = "WeaponBar"
-    weaponBar.Size = UDim2.new(0, 300, 0, 60)
-    weaponBar.Position = UDim2.new(0.5, -150, 1, -100)
-    weaponBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    weaponBar.BackgroundTransparency = 0.5
-    weaponBar.BorderSizePixel = 0
-    weaponBar.Parent = screenGui
-    
-    -- Weapon slots (1-6)
-    for i = 1, 6 do
-        local weaponSlot = Instance.new("TextButton")
-        weaponSlot.Name = "WeaponSlot" .. i
-        weaponSlot.Size = UDim2.new(0, 40, 0, 40)
-        weaponSlot.Position = UDim2.new(0, (i-1)*50 + 10, 0, 10)
-        weaponSlot.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        weaponSlot.BorderColor3 = Color3.fromRGB(100, 100, 100)
-        weaponSlot.Text = i
-        weaponSlot.TextColor3 = Color3.fromRGB(255, 255, 255)
-        weaponSlot.Font = Enum.Font.GothamBold
-        weaponSlot.TextScaled = true
-        weaponSlot.Parent = weaponBar
-        
-        -- Hover effect
-        weaponSlot.MouseEnter:Connect(function()
-            weaponSlot.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-        end)
-        
-        weaponSlot.MouseLeave:Connect(function()
-            if CombatGui.activeWeapon ~= i then
-                weaponSlot.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            else
-                weaponSlot.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Active color
-            end
-        end)
-        
-        -- Select weapon
-        weaponSlot.MouseButton1Click:Connect(function()
-            CombatGui:selectWeapon(i)
-        end)
-    end
+    -- Weapon Selection Bar (DEPRECATED - Handled by InventoryGui now)
+    -- Kept hidden for legacy logic safety if needed, or removed entirely.
+    -- Removing visual elements to prevent duplication.
     
     -- Current Weapon Display
     local currentWeaponFrame = Instance.new("Frame")
@@ -116,35 +77,66 @@ end
 function CombatGui:selectWeapon(slotNumber)
     if not CombatGui.combatEnabled then return end
     
-    -- In a real implementation, this would check if the player has a weapon in this slot
-    local weaponNames = {"Stick", "Spear", "Knife", "Bow", "Axe", "Machete"}
-    local selectedWeapon = weaponNames[slotNumber]
+    -- Dynamic Inventory System
+    -- Get all tools from Backpack and Character
+    local tools = {}
+    local character = Player.Character
+    local backpack = Player:FindFirstChild("Backpack")
     
-    if selectedWeapon then
-        CombatGui.activeWeapon = slotNumber
-        CombatGui.activeWeaponName = selectedWeapon
+    if backpack then
+        for _, item in pairs(backpack:GetChildren()) do
+            if item:IsA("Tool") then table.insert(tools, item) end
+        end
+    end
+    if character then
+        for _, item in pairs(character:GetChildren()) do
+            if item:IsA("Tool") then table.insert(tools, item) end
+        end
+    end
+    
+    -- Sort tools ensures consistent ordering (e.g. alphabetical or by internal priority if added)
+    -- For now, alphabetical is a simple restart-proof way to keep slots consistent
+    table.sort(tools, function(a, b) return a.Name < b.Name end)
+    
+    local foundTool = tools[slotNumber]
+    local toolName = foundTool and foundTool.Name
+    
+    -- UI Update
+    CombatGui.activeWeapon = slotNumber
+    CombatGui.activeWeaponName = toolName
+    
+    -- Visual update for hotbar
+    -- (Handled by InventoryGui - we just print for debug)
+    print("[CombatGui] Selecting slot " .. slotNumber .. ": " .. (toolName or "Empty"))
+    
+    print("[CombatGui] Selecting slot " .. slotNumber .. ": " .. (toolName or "Empty"))
+    
+    -- Logic: Equip the tool
+    local character = Player.Character
+    local backpack = Player:FindFirstChild("Backpack")
+    
+    if character and backpack then
+        local humanoid = character:FindFirstChild("Humanoid")
         
-        -- Update UI
-        if CombatGui.combatGui then
-            local currentWeaponLabel = CombatGui.combatGui:FindFirstChild("CurrentWeaponFrame"):FindFirstChild("CurrentWeaponLabel")
-            if currentWeaponLabel then
-                currentWeaponLabel.Text = selectedWeapon
-            end
-            
-            -- Highlight selected slot
-            for i = 1, 6 do
-                local slot = CombatGui.combatGui.WeaponBar:FindFirstChild("WeaponSlot" .. i)
-                if slot then
-                    if i == slotNumber then
-                        slot.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-                    else
-                        slot.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                    end
+        -- 1. Unequip current tool
+        humanoid:UnequipTools()
+        
+        -- 2. Equip new tool if it exists
+        if toolName then
+            local tool = backpack:FindFirstChild(toolName)
+            if tool then
+                humanoid:EquipTool(tool)
+                print("[CombatGui] Equipped " .. toolName)
+            else
+                -- Is it already equipped? (Edge case)
+                local current = character:FindFirstChild(toolName)
+                if current then
+                    print("[CombatGui] Tool already equipped")
+                else
+                    warn("[CombatGui] Tool not found in backpack: " .. toolName)
                 end
             end
         end
-        
-        print("Selected weapon: " .. selectedWeapon)
     end
 end
 
@@ -195,23 +187,12 @@ function CombatGui:init()
         if gameProcessed then return end
         
         -- Number keys 1-6 to select weapons
+        -- Number keys are now handled by InventoryGui to prevent conflicts
         if CombatGui.combatEnabled then
-            if input.KeyCode == Enum.KeyCode.One then
-                CombatGui:selectWeapon(1)
-            elseif input.KeyCode == Enum.KeyCode.Two then
-                CombatGui:selectWeapon(2)
-            elseif input.KeyCode == Enum.KeyCode.Three then
-                CombatGui:selectWeapon(3)
-            elseif input.KeyCode == Enum.KeyCode.Four then
-                CombatGui:selectWeapon(4)
-            elseif input.KeyCode == Enum.KeyCode.Five then
-                CombatGui:selectWeapon(5)
-            elseif input.KeyCode == Enum.KeyCode.Six then
-                CombatGui:selectWeapon(6)
-            elseif input.KeyCode == Enum.KeyCode.F then
+             if input.KeyCode == Enum.KeyCode.F then
                 -- Primary attack key
                 CombatGui:meleeAttack()
-            end
+             end
         end
     end)
     
@@ -282,6 +263,23 @@ function CombatGui:init()
                         durabilityBar.BackgroundColor3 = Color3.fromRGB(255, 255, 100) -- Yellow
                     else
                         durabilityBar.BackgroundColor3 = Color3.fromRGB(255, 100, 100) -- Red
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- Check for already equipped weapon
+    task.delay(1, function()
+        local character = Player.Character
+        if character then
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+                local weaponNames = {"Stick", "Spear", "Knife", "Bow", "Axe", "Machete"}
+                for i, name in pairs(weaponNames) do
+                    if name == tool.Name then
+                        CombatGui:selectWeapon(i)
+                        break
                     end
                 end
             end

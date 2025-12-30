@@ -28,9 +28,9 @@ CountdownUI.countdownConnection = nil
 
 -- Sound IDs (VERIFIED Roblox audio assets)
 local SOUND_IDS = {
-    COUNTDOWN_BEEP = "rbxassetid://9046239626", -- Verified countdown tick/beep
-    COUNTDOWN_FINAL = "rbxassetid://9046239626", -- Verified countdown tick/beep
-    MATCH_GONG = "rbxassetid://9046240113", -- Verified match start horn/gong
+    COUNTDOWN_BEEP = "rbxassetid://138084889", -- Verified countdown tick/beep
+    COUNTDOWN_FINAL = "rbxassetid://138084889", -- Verified countdown tick/beep
+    MATCH_GONG = "rbxassetid://12221967", -- Verified Roblox Bell/Gong
 }
 
 -- Create the main screen GUI

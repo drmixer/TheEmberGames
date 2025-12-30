@@ -147,7 +147,13 @@ end
 function SpectatorMode:updatePlayerList()
     if not SpectatorMode.spectatorGui then return end
     
-    local playerListFrame = SpectatorMode.spectatorGui.SpectatorFrame.PlayerListFrame
+    if not SpectatorMode.spectatorGui then return end
+    
+    local specFrame = SpectatorMode.spectatorGui:FindFirstChild("SpectatorFrame")
+    if not specFrame then return end
+    
+    local playerListFrame = specFrame:FindFirstChild("PlayerListFrame")
+    if not playerListFrame then return end
     
     -- Clear existing list
     for _, child in pairs(playerListFrame:GetChildren()) do

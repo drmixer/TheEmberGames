@@ -142,25 +142,42 @@ local function setupPlayer(player)
             local BotController = require(script.Parent.BotController)
             BotController:fillWithBots(count + 1) -- +1 for player
             print("Spawned " .. count .. " bots")
+        elseif cmd == "/drop" then
+            local TestingService = require(script.Parent.TestingService)
+            TestingService:spawnSupplyDrop()
+            print("Force spawned supply drop!")
+        elseif cmd == "/hazard" then
+            local TestingService = require(script.Parent.TestingService)
+            local types = {"WILDFIRE", "POISON_FOG", "ACID_RAIN"}
+            local type = args[2] or types[math.random(1, #types)]
+            TestingService:triggerHazard(type)
+            print("Triggered hazard: " .. type)
+        elseif cmd == "/storm" then
+            local phase = tonumber(args[2]) or 1
+            local TestingService = require(script.Parent.TestingService)
+            TestingService:skipToStormPhase(phase)
+            print("Skipped to storm phase " .. phase)
+        elseif cmd == "/clean" then
+             local TestingService = require(script.Parent.TestingService)
+             TestingService:removeAllBots()
+             print("Cleaned up bots")
         end
     end)
     
     -- When character spawns
     player.CharacterAdded:Connect(function(char)
-        task.wait(0.5)
-        teleportToSafeSpawn(player)
-        task.wait(1)
-        giveTestWeapons(player)
+        -- Test setup disabled to allow proper game loop spawning
+        -- task.wait(0.5)
+        -- teleportToSafeSpawn(player)
+        -- giveTestWeapons(player) 
     end)
     
     -- If character already exists, do it now
     if player.Character then
-        task.spawn(function()
-            task.wait(0.5)
-            teleportToSafeSpawn(player)
-            task.wait(1)
-            giveTestWeapons(player)
-        end)
+       -- task.spawn(function()
+       --     task.wait(0.5)
+       --     teleportToSafeSpawn(player)
+       -- end)
     end
 end
 
@@ -187,7 +204,7 @@ function TestSetup:setupForTesting()
         setupPlayer(player)
     end
     
-    print("[TestSetup] Ready! Commands: /tp, /give [weapon], /heal, /die, /bots [count]")
+    print("[TestSetup] Ready! Commands: /tp, /give, /drop, /hazard, /heal")
 end
 
 return TestSetup

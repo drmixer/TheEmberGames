@@ -40,6 +40,20 @@ local function initializeSpawnPositions()
     
     CharacterSpawner.spawnPositions = {}
     
+
+        
+    -- Raycast setup to find floor only (ignore trees)
+    local mapBase = workspace:FindFirstChild("MapBase")
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Include
+    if mapBase then
+        raycastParams.FilterDescendantsInstances = {mapBase}
+    else
+        warn("[CharacterSpawner] MapBase not found, raycast might fail")
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude -- Fallback
+        raycastParams.FilterDescendantsInstances = {workspace.CurrentCamera}
+    end
+
     for i = 1, 24 do
         local angle = (i - 1) * (2 * math.pi / 24)
         local x = arenaCenter.X + radius * math.cos(angle)
@@ -47,8 +61,8 @@ local function initializeSpawnPositions()
         
         -- Raycast to find terrain height
         local origin = Vector3.new(x, 200, z)
-        local result = workspace:Raycast(origin, Vector3.new(0, -300, 0))
-        local groundY = result and result.Position.Y or 8 -- Default to 8 if nil (flat cornucopia level)
+        local result = workspace:Raycast(origin, Vector3.new(0, -300, 0), raycastParams)
+        local groundY = result and result.Position.Y or 6 -- Default to floor level (6) if misses
         
         local platformY = groundY + PLATFORM_CONFIG.HEIGHT
         
@@ -77,7 +91,49 @@ function CharacterSpawner:createSpawnPlatforms()
     
     CharacterSpawner.spawnPlatforms = {}
     
+    -- Helper to create a hollow tube shaft
+    local function createTube(position, height)
+        local tubeGroup = Instance.new("Model")
+        tubeGroup.Name = "TubeStructure"
+        
+        local wallConfig = {
+            Size = Vector3.new(8, height, 1), -- Walls slightly wider than platform (6)
+            Color = Color3.fromRGB(30, 30, 30),
+            Material = Enum.Material.Metal
+        }
+        
+        -- 4 Walls
+        local offsets = {
+            Vector3.new(0, 0, 4),  -- Front
+            Vector3.new(0, 0, -4), -- Back
+            Vector3.new(4, 0, 0),  -- Right
+            Vector3.new(-4, 0, 0)  -- Left
+        }
+        
+        for i, offset in ipairs(offsets) do
+            local wall = Instance.new("Part")
+            wall.Name = "Wall_" .. i
+            -- Rotate side walls
+            if offset.X ~= 0 then
+                 wall.Size = Vector3.new(1, height, 8)
+            else
+                 wall.Size = Vector3.new(8, height, 1)
+            end
+            
+            -- Position: Center - (Height/2) guarantees it goes DOWN from surface
+            wall.Position = position - Vector3.new(0, height/2 + 0.5, 0) + offset
+            wall.Anchored = true
+            wall.CanCollide = true -- Keep players in
+            wall.Color = wallConfig.Color
+            wall.Material = wallConfig.Material
+            wall.Parent = tubeGroup
+        end
+        
+        tubeGroup.Parent = folder
+    end
+
     for i, data in ipairs(CharacterSpawner.spawnPositions) do
+        -- Main Platform (Anchored)
         local platform = Instance.new("Part")
         platform.Name = "Platform_" .. i
         platform.Size = PLATFORM_CONFIG.SIZE
@@ -86,33 +142,45 @@ function CharacterSpawner:createSpawnPlatforms()
         platform.CanCollide = true
         platform.Material = PLATFORM_CONFIG.MATERIAL
         platform.Color = PLATFORM_CONFIG.COLOR
+        platform:SetAttribute("OriginalCFrame", platform.CFrame) -- Store CFrame instead of Position
         platform.Parent = folder
         
-        -- Pillar
-        local pillarHeight = PLATFORM_CONFIG.HEIGHT
+        -- Pillar (Visual support)
+        local pillarHeight = PLATFORM_CONFIG.HEIGHT + 30 
         local pillar = Instance.new("Part")
+        pillar.Name = "Pillar"
         pillar.Size = Vector3.new(2, pillarHeight, 2)
-        -- Position should be below platform. Platform Y is center.
-        -- Pillar bottom is at GroundY. Pillar Top is at (PlatformY - SIZE.Y/2).
-        -- Easier math: just place it halfway between platform and ground.
-        pillar.Position = data.platformPosition - Vector3.new(0, pillarHeight/2 + 0.5, 0)
-        pillar.Anchored = true
-        pillar.CanCollide = true
+        pillar.Position = data.platformPosition - Vector3.new(0, 0.5 + pillarHeight/2, 0)
+        pillar.Anchored = false -- Welded
+        pillar.CanCollide = false 
         pillar.Material = Enum.Material.Concrete
         pillar.Color = Color3.fromRGB(60,60,60)
-        pillar.Parent = folder
+        pillar.Parent = platform
         
-        -- Glow
+        local pillarWeld = Instance.new("WeldConstraint")
+        pillarWeld.Part0 = platform
+        pillarWeld.Part1 = pillar
+        pillarWeld.Parent = platform
+        
+        -- Glow Ring
         local glow = Instance.new("Part")
         glow.Name = "GlowRing"
         glow.Size = Vector3.new(6, 0.2, 6)
         glow.Position = data.platformPosition + Vector3.new(0, 0.6, 0)
-        glow.Anchored = true
+        glow.Anchored = false
         glow.CanCollide = false
         glow.Material = Enum.Material.Neon
         glow.Color = PLATFORM_CONFIG.COLOR
         glow.Transparency = 0.5
-        glow.Parent = platform -- Attach to platform so it cleans up with it
+        glow.Parent = platform
+        
+        local glowWeld = Instance.new("WeldConstraint")
+        glowWeld.Part0 = platform
+        glowWeld.Part1 = glow
+        glowWeld.Parent = platform
+        
+        -- Create the visual tube shaft
+        createTube(data.platformPosition, 40) -- Deep shaft
         
         table.insert(CharacterSpawner.spawnPlatforms, platform)
     end
@@ -154,27 +222,60 @@ function CharacterSpawner:spawnPlayer(player)
     
     player:LoadCharacter() -- Force Respawn
     
-    -- Teleport when Character loads
+    -- Teleport logic
+    local function teleportToPlatform(char)
+         local root = char:WaitForChild("HumanoidRootPart", 10)
+         local hum = char:WaitForChild("Humanoid", 10)
+         if not root or not hum then return end
+         
+         -- Find platform
+         local platformName = "Platform_" .. index
+         local platformsFolder = workspace:FindFirstChild("SpawnPlatforms")
+         local platform = platformsFolder and platformsFolder:FindFirstChild(platformName)
+         
+         local targetPos = data.position
+         if platform then
+             -- Position on top of platform
+             targetPos = platform.Position + Vector3.new(0, 5, 0) -- Increased to 5 for safety
+             root.CFrame = CFrame.new(targetPos, Vector3.new(0, targetPos.Y, 0))
+             root.Anchored = true
+             hum.WalkSpeed = 0
+             hum.JumpPower = 0
+             
+             -- Reset camera
+             task.delay(0.2, function()
+                 spawnerRemoteEvent:FireClient(player, "RESET_CAMERA")
+             end)
+             print("[CharacterSpawner] Teleported (Anchored) " .. player.Name .. " to " .. platformName)
+         else
+             warn("[CharacterSpawner] Platform " .. platformName .. " missing!")
+             -- Fallback
+             root.CFrame = CFrame.new(data.position + Vector3.new(0,5,0))
+             root.Anchored = true 
+         end
+         
+         CharacterSpawner.playersSpawned[player] = true
+         spawnerRemoteEvent:FireClient(player, "SPAWNED_ON_PLATFORM", index, targetPos)
+    end
+
+    -- Initial teleport
+    if player.Character then
+        teleportToPlatform(player.Character)
+    end
+
+    -- Listen for respawns during countdown
     local connection
     connection = player.CharacterAdded:Connect(function(char)
-        connection:Disconnect()
-        local root = char:WaitForChild("HumanoidRootPart")
-        local hum = char:WaitForChild("Humanoid")
-        task.wait(0.1)
-        root.CFrame = CFrame.new(data.position, Vector3.new(0, data.position.Y, 0)) -- Look at center
-        
-        if CharacterSpawner.countdownActive then
-            CharacterSpawner:setPlayerMovementLock(player, true)
+        if not CharacterSpawner.countdownActive then
+            connection:Disconnect()
+            return
         end
-        
-        -- Give Items
-        local inv = require(script.Parent.InventoryController)
-        inv:addItem(player, "Apples", 2)
-        inv:addItem(player, "Water", 1)
-        
-        CharacterSpawner.playersSpawned[player] = true
-        spawnerRemoteEvent:FireClient(player, "SPAWNED_ON_PLATFORM", index, data.position)
+        task.wait(0.2) 
+        teleportToPlatform(char)
     end)
+    
+    -- Cleanup connection later
+    CharacterSpawner.playersOnPlatform[player] = connection 
 end
 
 function CharacterSpawner:startCountdown(duration)
@@ -189,13 +290,84 @@ end
 function CharacterSpawner:endCountdown()
     CharacterSpawner.countdownActive = false
     CharacterSpawner:activatePlatformGlow(false)
+    
     for plr, _ in pairs(CharacterSpawner.playersSpawned) do
         CharacterSpawner:setPlayerMovementLock(plr, false)
+        
+        -- Restore Physics & Movement
+        if plr.Character then
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.Anchored = false
+            end
+            local hum = plr.Character:FindFirstChild("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+            end
+        end
+        
+        -- Disconnect listener
+        if CharacterSpawner.playersOnPlatform[plr] then
+            CharacterSpawner.playersOnPlatform[plr]:Disconnect()
+            CharacterSpawner.playersOnPlatform[plr] = nil
+        end
     end
     
     -- Start Match
     local MatchService = require(script.Parent.MatchService)
     MatchService:startMatch()
+end
+
+
+function CharacterSpawner:preparePlatforms()
+    print("[CharacterSpawner] Lowering platforms to tube start position...")
+    for _, platform in ipairs(CharacterSpawner.spawnPlatforms) do
+        local origCF = platform:GetAttribute("OriginalCFrame")
+        if origCF then
+            -- Move down 25 studs (deep enough for tube effect)
+            local downCF = origCF - Vector3.new(0, 25, 0)
+            platform.CFrame = downCF -- Using CFrame updates welds safely
+        end
+    end
+end
+
+function CharacterSpawner:risePlatforms(duration)
+    print("[CharacterSpawner] Initiating platform rise sequence (" .. duration .. "s)")
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    -- 1. Tween Platforms
+    for _, platform in ipairs(CharacterSpawner.spawnPlatforms) do
+        local origCF = platform:GetAttribute("OriginalCFrame")
+        if origCF then
+           TweenService:Create(platform, tweenInfo, {CFrame = origCF}):Play()
+        end
+    end
+    
+    -- 2. Tween Players (Manual CFrame Tween)
+    for player, _ in pairs(CharacterSpawner.playersSpawned) do
+         if player.Character and player.Character.PrimaryPart then
+             local currentCF = player.Character.PrimaryPart.CFrame
+             local targetCF = currentCF + Vector3.new(0, 25, 0) -- Rise same amount
+             
+             TweenService:Create(player.Character.PrimaryPart, tweenInfo, {CFrame = targetCF}):Play()
+         end
+    end
+    
+    -- 3. Tween Bots (Manual CFrame Tween)
+    -- We must find all bots that were placed on platforms
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child:IsA("Model") and child:FindFirstChild("IsBot") and child.PrimaryPart then
+            -- Only tween if it's on a platform (optional check: if anchored)
+             local currentCF = child.PrimaryPart.CFrame
+             local targetCF = currentCF + Vector3.new(0, 25, 0)
+             
+             TweenService:Create(child.PrimaryPart, tweenInfo, {CFrame = targetCF}):Play()
+        end
+    end
+    
+    -- 4. Notify Clients for FX
+    spawnerRemoteEvent:FireAllClients("RISE_SEQUENCE_START", duration)
 end
 
 function CharacterSpawner:init()

@@ -113,6 +113,24 @@ function InventoryController:addItem(player, itemName, amount)
     return false
 end
 
+-- Get item count in player inventory
+function InventoryController:getItemCount(player, itemName)
+    if not InventoryController.playerInventories[player] then
+        return 0
+    end
+    
+    local inventory = InventoryController.playerInventories[player]
+    local count = 0
+    
+    for _, slot in ipairs(inventory.slots) do
+        if slot.name == itemName then
+            count = count + slot.amount
+        end
+    end
+    
+    return count
+end
+
 -- Remove item from player inventory
 function InventoryController:removeItem(player, itemName, amount)
     if not InventoryController.playerInventories[player] then

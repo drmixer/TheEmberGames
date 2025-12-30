@@ -117,132 +117,124 @@ function VictoryUI:showEliminationPopup(data)
     end)
 end
 
--- Full Screen Victory/Defeat Display
+-- Full Screen Victory/Defeat Display (Refined)
 function VictoryUI:showVictorySequence(data)
     if not VictoryUI.screenGui then return end
     
-    local isWinner = (data.winnerId == Player.UserId)
-    local mainColor = isWinner and UITheme.Colors.Gold or UITheme.Colors.Danger
-    local titleText = isWinner and "VICTORY" or "ELIMINATED"
+    -- Clear any existing UI
+    for _, child in pairs(VictoryUI.screenGui:GetChildren()) do
+        child:Destroy() 
+    end
     
-    -- Main Container (Fade In)
+    local isWinner = (data.winnerId == Player.UserId)
+    
+    if not isWinner then return end -- Only show big victory for winner? Assuming yes based on req. If not, text changes to ELIMINATED.
+    
+    -- Main Container
     local screen = Instance.new("Frame")
     screen.Size = UDim2.new(1, 0, 1, 0)
-    screen.BackgroundColor3 = Color3.new(0,0,0)
-    screen.BackgroundTransparency = 1 -- Start transparent
+    screen.BackgroundTransparency = 1 
     screen.Parent = VictoryUI.screenGui
     
-    -- Animate background darkness
-    TweenService:Create(screen, TweenInfo.new(1), {BackgroundTransparency = 0.3}):Play()
+    -- Play fanfare
+    local sound = Instance.new("Sound", PlayerGui)
+    sound.SoundId = SOUND_IDS.VICTORY_FANFARE
+    sound:Play()
     
-    -- Center Emphasis Strip (Cinematic Letterbox Style)
-    local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 200)
-    strip.Position = UDim2.new(0, 0, 0.5, 0)
-    strip.AnchorPoint = Vector2.new(0, 0.5)
-    UITheme.applyGlass(strip, 0.1) -- Very dark glass
-    strip.BackgroundColor3 = mainColor
-    strip.BackgroundTransparency = 0.8
-    strip.Parent = screen
-    
-    -- Big Title
+    -- 1. BIG VICTORY TEXT
     local title = Instance.new("TextLabel")
-    title.Text = titleText
-    title.Size = UDim2.new(1, 0, 0, 80)
-    title.Position = UDim2.new(0, 0, 0.5, -40)
-    title.AnchorPoint = Vector2.new(0, 0.5)
+    title.Text = "VICTORY"
+    title.Size = UDim2.new(1, 0, 0, 150)
+    title.Position = UDim2.new(0.5, 0, 0.4, 0)
+    title.AnchorPoint = Vector2.new(0.5, 0.5)
     title.BackgroundTransparency = 1
-    title.TextColor3 = mainColor
+    title.TextColor3 = UITheme.Colors.Gold
     title.Font = UITheme.Fonts.Title
-    title.TextSize = 80
-    title.Parent = strip
+    title.TextSize = 100
+    title.TextStrokeTransparency = 0.5
+    title.TextStrokeColor3 = Color3.new(0,0,0)
+    title.Parent = screen
     
-    -- Winner Name (if checking someone else win)
-    if not isWinner then
-        local sub = Instance.new("TextLabel")
-        sub.Text = "Winner: " .. (data.winner or "Unknown")
-        sub.Size = UDim2.new(1, 0, 0, 30)
-        sub.Position = UDim2.new(0, 0, 0.8, 0)
-        sub.BackgroundTransparency = 1
-        sub.TextColor3 = UITheme.Colors.Text
-        sub.Font = UITheme.Fonts.Label
-        sub.TextSize = 24
-        sub.Parent = strip
-    else
-        -- Confetti for winner
-        local sub = Instance.new("TextLabel")
-        sub.Text = "THE ARENA IS YOURS"
-        sub.Size = UDim2.new(1, 0, 0, 30)
-        sub.Position = UDim2.new(0, 0, 0.8, 0)
-        sub.BackgroundTransparency = 1
-        sub.TextColor3 = UITheme.Colors.GoldHighlight
-        sub.Font = UITheme.Fonts.Label
-        sub.TextSize = 18
-        sub.LetterSpacing = 3
-        sub.Parent = strip
-        
-        -- Play fanfare
-        local sound = Instance.new("Sound", PlayerGui)
-        sound.SoundId = SOUND_IDS.VICTORY_FANFARE
-        sound:Play()
-    end
-    
-    -- Stats Row (Bottom)
-    local statsRow = Instance.new("Frame")
-    statsRow.Size = UDim2.new(0, 600, 0, 60)
-    statsRow.Position = UDim2.new(0.5, 0, 0.7, 0) -- Below strip
-    statsRow.AnchorPoint = Vector2.new(0.5, 0)
-    statsRow.BackgroundTransparency = 1
-    statsRow.Parent = screen
-    
-    local layout = Instance.new("UIListLayout")
-    layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.Padding = UDim.new(0, 20)
-    layout.Parent = statsRow
-    
-    -- Helper to create stat pill
-    local function makeStat(label, value)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 150, 1, 0)
-        UITheme.applyGlass(frame, 0.4)
-        frame.Parent = statsRow
-        
-        local l = Instance.new("TextLabel")
-        l.Text = label
-        l.Size = UDim2.new(1, 0, 0.4, 0)
-        l.BackgroundTransparency = 1
-        l.TextColor3 = UITheme.Colors.TextDim
-        l.Font = UITheme.Fonts.Label
-        l.TextSize = 12
-        l.Parent = frame
-        
-        local v = Instance.new("TextLabel")
-        v.Text = value
-        v.Size = UDim2.new(1, 0, 0.6, 0)
-        v.Position = UDim2.new(0,0,0.4,0)
-        v.BackgroundTransparency = 1
-        v.TextColor3 = UITheme.Colors.Text
-        v.Font = UITheme.Fonts.Header
-        v.TextSize = 22
-        v.Parent = frame
-    end
-    
-    makeStat("ELIMINATIONS", tostring(data.kills or 0))
-    makeStat("TIME SURVIVED", string.format("%d:%02d", math.floor((data.matchDuration or 0)/60), (data.matchDuration or 0)%60))
-    makeStat("PLACEMENT", "#" .. (data.placement or "1"))
-    
-    -- Return Button (Bottom Center)
-    local btn = UITheme.createButton({
-        Text = "RETURN TO LOBBY",
-        Size = UDim2.new(0, 250, 0, 50),
-        Position = UDim2.new(0.5, -125, 0.85, 0),
-        OnClick = function()
-            -- logic handled by server kick or client request usually
-            print("Requesting Lobby Return") 
-        end
+    -- Animate Title Pop-in
+    title.TextTransparency = 1
+    title.TextSize = 150
+    local tweenIn = TweenService:Create(title, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        TextTransparency = 0,
+        TextSize = 100
     })
-    btn.Parent = screen
+    tweenIn:Play()
+    
+    -- Flame/Ember Decoration (Visual only)
+    -- Flame/Ember Decoration (Procedural - No Asset ID to fail)
+    -- Using a Frame with UIGradient to simulate a fire glow
+    local glowFrame = Instance.new("Frame")
+    glowFrame.Size = UDim2.new(0, 500, 0, 500)
+    glowFrame.Position = UDim2.new(0.5, 0, 0.4, 0)
+    glowFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    glowFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    glowFrame.BackgroundTransparency = 0 -- Gradient will control transparency
+    glowFrame.BorderSizePixel = 0
+    glowFrame.ZIndex = 0
+    glowFrame.Parent = screen
+    
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 0)), -- Yellow Center
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 100, 0)), -- Orange Middle
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 0, 0)) -- Red Edge
+    })
+    gradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0), -- Opaque center
+        NumberSequenceKeypoint.new(0.6, 0.2),
+        NumberSequenceKeypoint.new(1, 1) -- Transparent edges
+    })
+    gradient.Rotation = 45
+    gradient.Parent = glowFrame
+    
+    -- Round mask
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0) -- Circle
+    corner.Parent = glowFrame
+    
+    -- Animate Pulse
+    local tweenPulse = TweenService:Create(glowFrame, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        Size = UDim2.new(0, 600, 0, 600),
+        BackgroundTransparency = 0.2
+    })
+    tweenPulse:Play()
+    
+    -- Rotate Gradient
+    task.spawn(function()
+        local rot = 0
+        while glowFrame.Parent do
+            rot = rot + 2
+            gradient.Rotation = rot
+            task.wait(0.05)
+        end
+    end)
+    
+    -- 2. Countdown Return Logic
+    task.delay(4, function()
+        if not screen or not screen.Parent then return end
+        
+        local returnLabel = Instance.new("TextLabel")
+        returnLabel.Text = "Returning to main menu in 3..."
+        returnLabel.Size = UDim2.new(1, 0, 0, 50)
+        returnLabel.Position = UDim2.new(0, 0, 0.85, 0)
+        returnLabel.BackgroundTransparency = 1
+        returnLabel.TextColor3 = UITheme.Colors.Text
+        returnLabel.Font = UITheme.Fonts.Header
+        returnLabel.TextSize = 24
+        returnLabel.TextTransparency = 1
+        returnLabel.Parent = screen
+        
+        TweenService:Create(returnLabel, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+        
+        -- Countdown
+        task.delay(1, function() returnLabel.Text = "Returning to main menu in 2..." end)
+        task.delay(2, function() returnLabel.Text = "Returning to main menu in 1..." end)
+        task.delay(3, function() returnLabel.Text = "Returning to main menu..." end)
+    end)
 end
 
 -- Premium Countdown (Top Overlay)
@@ -359,6 +351,12 @@ function VictoryUI.init()
                 VictoryUI:showCountdownOverlay(args[1])
             elseif eventType == "MATCH_START_HORN" then
                 VictoryUI:hideCountdownOverlay()
+            elseif eventType == "RETURN_TO_LOBBY" then
+                if VictoryUI.screenGui then
+                    for _, child in pairs(VictoryUI.screenGui:GetChildren()) do
+                        child:Destroy()
+                    end
+                end
             end
         end)
     end

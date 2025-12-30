@@ -29,6 +29,12 @@ local BOT_NAMES = {
     "Career_Hunter", "Career_Fighter", "Survivor_1", "Survivor_2"
 }
 
+-- Bot Outfits (Reliable Combat Sets)
+local BOT_OUTFITS = {
+    {shirt = "http://www.roblox.com/asset/?id=144076358", pants = "http://www.roblox.com/asset/?id=144076468"}, -- Green Camo
+    {shirt = "http://www.roblox.com/asset/?id=606361074", pants = "http://www.roblox.com/asset/?id=606364287"}  -- Urban Camo
+}
+
 -- BALANCED Bot difficulty levels (more aggressive now)
 local DIFFICULTY = {
     EASY = {
@@ -81,7 +87,7 @@ local function createBotCharacter(botData)
     local torso = Instance.new("Part")
     torso.Name = "Torso"
     torso.Size = Vector3.new(2, 2, 1)
-    torso.Color = Color3.fromRGB(math.random(100, 200), math.random(100, 200), math.random(100, 200))
+    torso.Color = Color3.fromRGB(80, 80, 80) -- Dark shirt
     torso.CanCollide = true
     torso.Parent = character
     
@@ -117,16 +123,56 @@ local function createBotCharacter(botData)
     local leftLeg = Instance.new("Part")
     leftLeg.Name = "Left Leg"
     leftLeg.Size = Vector3.new(1, 2, 1)
-    leftLeg.Color = Color3.fromRGB(100, 100, 100)
+    leftLeg.Color = Color3.fromRGB(40, 40, 40) -- Black pants
     leftLeg.CanCollide = false
     leftLeg.Parent = character
     
     local rightLeg = Instance.new("Part")
     rightLeg.Name = "Right Leg"
     rightLeg.Size = Vector3.new(1, 2, 1)
-    rightLeg.Color = Color3.fromRGB(100, 100, 100)
+    rightLeg.Color = Color3.fromRGB(40, 40, 40) -- Black pants
     rightLeg.CanCollide = false
     rightLeg.Parent = character
+    
+    -- Add Tactical Vest (Procedural)
+    local vest = Instance.new("Part")
+    vest.Name = "Vest"
+    vest.Size = Vector3.new(2.1, 1.2, 1.1) -- Chest protection
+    vest.Color = Color3.fromRGB(50, 60, 50) -- Dark Olive
+    vest.Material = Enum.Material.Fabric
+    vest.CanCollide = false
+    vest.Parent = character
+    
+    local vestWeld = Instance.new("Weld")
+    vestWeld.Part0 = torso
+    vestWeld.Part1 = vest
+    vestWeld.C0 = CFrame.new(0, 0.4, 0) -- Upper chest
+    vestWeld.Parent = vest
+    
+    -- Add Knee Pads
+    local padColor = Color3.fromRGB(20, 20, 20)
+    
+    local leftPad = Instance.new("Part")
+    leftPad.Size = Vector3.new(1.1, 0.5, 1.1)
+    leftPad.Color = padColor
+    leftPad.CanCollide = false
+    leftPad.Parent = character
+    local lpWeld = Instance.new("Weld")
+    lpWeld.Part0 = leftLeg
+    lpWeld.Part1 = leftPad
+    lpWeld.C0 = CFrame.new(0, -0.2, 0) -- Knee height
+    lpWeld.Parent = leftPad
+    
+    local rightPad = Instance.new("Part")
+    rightPad.Size = Vector3.new(1.1, 0.5, 1.1)
+    rightPad.Color = padColor
+    rightPad.CanCollide = false
+    rightPad.Parent = character
+    local rpWeld = Instance.new("Weld")
+    rpWeld.Part0 = rightLeg
+    rpWeld.Part1 = rightPad
+    rpWeld.C0 = CFrame.new(0, -0.2, 0)
+    rpWeld.Parent = rightPad
     
     -- Simple weapon visual
     local weapon = Instance.new("Part")
@@ -205,14 +251,48 @@ function BotController:createBot(district, difficulty)
     local character = createBotCharacter(botData)
     botData.character = character
     
-    -- Spawn at random position
-    local arenaSize = Config.ARENA_SIZE / 2
-    local spawnPos = Vector3.new(
-        math.random(-arenaSize * 0.6, arenaSize * 0.6),
-        50,
-        math.random(-arenaSize * 0.6, arenaSize * 0.6)
-    )
-    character:SetPrimaryPartCFrame(CFrame.new(spawnPos))
+    local character = createBotCharacter(botData)
+    botData.character = character
+    
+    -- Spawn on platform (starting after real players)
+    local platformIndex = #Players:GetPlayers() + botId -- Offset by player count
+    if platformIndex > 24 then platformIndex = 24 end -- Cap safe index
+    
+    local platformName = "Platform_" .. platformIndex
+    local platformsFolder = workspace:FindFirstChild("SpawnPlatforms")
+    local platform = platformsFolder and platformsFolder:FindFirstChild(platformName)
+    
+    local spawnPos
+    if platform then
+        -- Check if platform has an "OriginalCFrame" (meaning it is tracked by Spawner)
+        local origCF = platform:GetAttribute("OriginalCFrame")
+        if origCF then
+            -- We want to spawn on the *lowered* state (Original - 25 studs)
+            -- Only use OriginalCFrame as reference, calculate lowered position manually to be safe
+            local loweredPos = origCF.Position - Vector3.new(0, 25, 0)
+            spawnPos = loweredPos + Vector3.new(0, 5, 0) -- On top of lowered platform
+        else
+            -- Platform exists but hasn't been prepared yet (unlikely if loop order is correct, but safe fallback)
+            -- Just put them underground to match
+             spawnPos = platform.Position - Vector3.new(0, 20, 0) -- Guessing lowered state
+        end
+    else
+        -- Fallback circle
+        local angle = (platformIndex/24) * math.pi * 2
+        local x = math.cos(angle) * 45
+        local z = math.sin(angle) * 45
+        spawnPos = Vector3.new(x, -20, z) -- Underground
+    end
+    
+    character:SetPrimaryPartCFrame(CFrame.new(spawnPos, Vector3.new(0, spawnPos.Y, 0))) -- Look at center
+    
+    -- Freeze initially (Anchored)
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.Anchored = true end
+    
+    -- Tag bot for CharacterSpawner to find
+    character:SetAttribute("PlatformIndex", platformIndex)
+    
     character.Parent = workspace
     
     BotController.bots[botId] = botData
@@ -295,6 +375,20 @@ function BotController:updateBotBehavior(botData)
         -- Idle - sometimes start roaming
         if math.random() < 0.2 then
             botData.state = "roaming"
+        end
+    end
+end
+
+-- Release bots (start of match)
+function BotController:unfreezeBots()
+    print("[BotController] Releasing bots!")
+    for _, bot in pairs(BotController.bots) do
+        if bot.character then
+            local hrp = bot.character:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.Anchored = false end
+            
+            -- Also set lastAction to now so they don't instant-react
+            bot.lastAction = tick()
         end
     end
 end
@@ -501,11 +595,19 @@ function BotController:eliminateBot(botData)
     -- Notify match service
     local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
     if matchRemote then
+        -- We calculate remaining including players, but this event is just a visual feed update usually
+        -- The REAL logic handles victory below
         local remaining = BotController:getAliveCount() + #Players:GetPlayers()
         matchRemote:FireAllClients("TRIBUTE_ELIMINATED", {
             name = botData.name,
             remaining = remaining
         })
+    end
+    
+    -- IMPORTANT: Tell MatchService to check for win condition!
+    local MatchService = require(script.Parent.MatchService)
+    if MatchService then
+        MatchService:checkVictoryCondition()
     end
 end
 

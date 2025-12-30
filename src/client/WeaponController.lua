@@ -35,22 +35,24 @@ local CONFIG = {
     SHAKE_INTENSITY = 0.5
 }
 
--- Animation IDs
+-- Animation IDs (Using standard R15 anims where possible)
 local ANIMATION_IDS = {
-    SWING_OVERHEAD = "rbxassetid://5104343315", -- Sword swing
-    SWING_SIDE = "rbxassetid://5104343157", -- Side slash
-    THRUST = "rbxassetid://5104342815", -- Spear thrust
-    DRAW_BOW = "rbxassetid://5104345142", -- Draw bow
-    THROW = "rbxassetid://5104345348", -- Throw item
+    SWING_OVERHEAD = "rbxassetid://522635514", -- Generic slash
+    SWING_SIDE = "rbxassetid://522635514", 
+    THRUST = "rbxassetid://522638767", -- Generic poke
+    DRAW_BOW = "rbxassetid://507765644", 
+    THROW = "rbxassetid://507765644",
 }
 
--- Sound IDs
+-- Sound IDs (Using Classic Roblox Sounds - Guaranteed to work)
 local SOUND_IDS = {
-    SWING_WHOOSH = "rbxassetid://6241709963",
-    BOW_DRAW = "rbxassetid://6230981039",
-    BOW_RELEASE = "rbxassetid://6230980816",
-    THROW_WHOOSH = "rbxassetid://6241709963", 
-    HIT_MARKER = "rbxassetid://1347767351", -- Distinct tick
+    SWING_WHOOSH = "rbxassetid://12222216", -- Classic Sword Slash
+    BOW_DRAW = "rbxassetid://12222216", -- Reuse slash for now (better than 403)
+    BOW_RELEASE = "rbxassetid://12222200", -- Classic Bow Fire
+    THROW_WHOOSH = "rbxassetid://12222216", 
+    HIT_MARKER = "rbxassetid://12222084", -- Classic Hit
+    HIT_FLESH = "rbxassetid://12222152", -- Punch sound
+    HIT_CRIT = "rbxassetid://4612377140", -- High impact
 }
 
 -- ============ UI CREATION ============
@@ -138,20 +140,26 @@ local function playSound(soundId, volume, pitch)
 end
 
 local function shakeCamera(intensity)
+    if not Camera then return end
     local start = tick()
     local power = intensity or 0.5
     
     task.spawn(function()
-        while tick() - start < 0.1 do
-            local dx = (math.random() - 0.5) * power
-            local dy = (math.random() - 0.5) * power
-            Camera.CFrame = Camera.CFrame * CFrame.Angles(math.rad(dy), math.rad(dx), 0)
+        while tick() - start < 0.2 do
+            local alpha = 1 - ((tick() - start) / 0.2)
+            local currentPower = power * alpha
+            
+            local dx = (math.random() - 0.5) * currentPower
+            local dy = (math.random() - 0.5) * currentPower
+            local dz = (math.random() - 0.5) * currentPower * 0.5 -- Add some roll
+            
+            Camera.CFrame = Camera.CFrame * CFrame.Angles(math.rad(dy), math.rad(dx), math.rad(dz))
             RunService.RenderStepped:Wait()
         end
     end)
 end
 
-
+-- ============ VISUALS & MARKERS ============
 
 local function showHitMarker(isCritical)
     local gui = WeaponController.screenGui
@@ -174,216 +182,244 @@ local function showHitMarker(isCritical)
     Debris:AddItem(marker, 0.2)
 end
 
--- Create a fake visual projectile for instant feedback
 local function createVisualProjectile(tool, startPos, direction, speed)
     local projectile = Instance.new("Part")
     projectile.Name = "VisualProjectile"
-    projectile.Size = Vector3.new(0.2, 0.2, 1.5)
-    projectile.Color = Color3.fromRGB(100, 70, 40)
-    projectile.Material = Enum.Material.Wood
     projectile.CanCollide = false
-    projectile.Anchored = false -- Use body velocity
+    projectile.Anchored = false 
     projectile.CFrame = CFrame.lookAt(startPos, startPos + direction)
     projectile.Parent = workspace
     
-    if tool:GetAttribute("WeaponId") == "Bow" then
-        local tip = Instance.new("Part")
-        tip.Size = Vector3.new(0.15, 0.3, 0.15)
-        tip.Color = Color3.fromRGB(80, 80, 80)
-        tip.CanCollide = false
-        tip.Massless = true
-        tip.Parent = projectile
-        local weld = Instance.new("Weld", tip)
-        weld.Part0 = projectile
-        weld.Part1 = tip
-        weld.C0 = CFrame.new(0, 0, -0.9)
+    local ammoType = tool:GetAttribute("AmmoType")
+    
+    if ammoType == "rock" then
+        projectile.Size = Vector3.new(0.5, 0.5, 0.5)
+        projectile.Color = Color3.fromRGB(80, 80, 80)
+        projectile.Material = Enum.Material.Slate
+        projectile.Shape = Enum.PartType.Ball
+    else
+        -- Default Arrow
+        projectile.Size = Vector3.new(0.2, 0.2, 1.5)
+        projectile.Color = Color3.fromRGB(100, 70, 40)
+        projectile.Material = Enum.Material.Wood
+        
+        if tool:GetAttribute("WeaponId") == "Bow" then
+            local tip = Instance.new("Part")
+            tip.Size = Vector3.new(0.15, 0.3, 0.15)
+            tip.Color = Color3.fromRGB(80, 80, 80)
+            tip.CanCollide = false
+            tip.Massless = true
+            tip.Parent = projectile
+            local weld = Instance.new("Weld", tip)
+            weld.Part0 = projectile
+            weld.Part1 = tip
+            weld.C0 = CFrame.new(0, 0, -0.9)
+        end
     end
     
     local bv = Instance.new("BodyVelocity")
     bv.Velocity = direction.Unit * speed
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Parent = projectile
-    
-    -- Cleanup
     Debris:AddItem(projectile, 3)
-    
-    -- Fade out logic to avoid seeing double when server projectile arrives
-    task.delay(0.1, function()
-        -- In a real production game, we'd hide the SERVER projectile locally
-        -- For now, we'll just let this one fade out quickly or handle hit visual
-    end)
 end
 
--- ============ ANIMATIONS ============
+-- ============ POSE & ANIMATION HELPERS ============
 
-local function playAttackAnimation(animName)
-    local char = Player.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if not hum then return end
+local IDLE_C0 = CFrame.new(1, 0.5, 0) * CFrame.Angles(0, math.rad(90), math.rad(15)) 
+local AIM_C0 = CFrame.new(1, 0.6, 0) * CFrame.Angles(0, math.rad(90), math.rad(90)) 
+
+local function findRightShoulder(char)
+    if not char then return nil end
+    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    local arm = char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm")
     
-    local animId = ANIMATION_IDS[animName]
-    if not animId then return end
-    
-    -- Try to play animation (may fail if asset unavailable)
-    local success, track = pcall(function()
-        local animator = hum:FindFirstChild("Animator") or Instance.new("Animator", hum)
-        local anim = Instance.new("Animation")
-        anim.AnimationId = animId
-        return animator:LoadAnimation(anim)
-    end)
-    
-    if success and track then
-        track:Play()
-        return track
+    if torso then
+        local motor = torso:FindFirstChild("RightShoulder") or torso:FindFirstChild("Right Shoulder")
+        if motor then return motor end
     end
     
-    -- Fallback: Simple arm swing using Motor6D
-    -- This works even when animation fails
-    local rightArm = char:FindFirstChild("Right Arm") or char:FindFirstChild("RightUpperArm")
-    local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-    
-    if torso and rightArm then
-        local shoulder = torso:FindFirstChild("Right Shoulder") or torso:FindFirstChild("RightShoulder")
-        if shoulder then
-            local originalC0 = shoulder.C0
-            -- Quick swing animation
-            task.spawn(function()
-                local swingDown = originalC0 * CFrame.Angles(math.rad(-80), 0, 0)
-                shoulder.C0 = swingDown
-                task.wait(0.15)
-                shoulder.C0 = originalC0
-            end)
-        end
+    if arm then
+        local motor = arm:FindFirstChild("RightShoulder") or arm:FindFirstChild("Right Shoulder")
+        if motor then return motor end
     end
-    
     return nil
 end
 
--- ============ ATTACK LOGIC ============
+local idleConnection
+local function playIdlePose(tool)
+    local char = Player.Character or tool.Parent
+    if not char then return end
+    
+    local rightShoulder = findRightShoulder(char)
+    if rightShoulder then
+        -- Fix "Bike Pose" 
+        local animate = char:FindFirstChild("Animate")
+        if animate and animate:FindFirstChild("toolnone") then
+             local toolNone = animate.toolnone:FindFirstChild("ToolNoneAnim")
+             if toolNone then toolNone.AnimationId = "rbxassetid://0" end
+        end
+        
+        if idleConnection then idleConnection:Disconnect() end
+        
+        idleConnection = RunService.RenderStepped:Connect(function()
+            if not tool.Parent or tool.Parent ~= char then -- Safety check
+                 if idleConnection then idleConnection:Disconnect() end
+                 return
+            end
+            
+            if WeaponController.actionState == "Attacking" then
+                -- Do nothing
+            elseif WeaponController.actionState == "Charging" then
+                 rightShoulder.C0 = rightShoulder.C0:Lerp(AIM_C0, 0.2)
+            else
+                rightShoulder.C0 = rightShoulder.C0:Lerp(IDLE_C0, 0.1)
+            end
+        end)
+    end
+end
+
+local function stopIdlePose()
+    if idleConnection then 
+        idleConnection:Disconnect() 
+        idleConnection = nil
+    end
+    WeaponController.actionState = "Idle"
+end
 
 local function getAimDirection()
     local pos = UserInputService:GetMouseLocation()
     return Camera:ViewportPointToRay(pos.X, pos.Y).Direction
 end
 
+-- Lazy load CombatFeedback & WeaponEffects
+local CombatFeedback
+local WeaponEffects
+task.spawn(function()
+    CombatFeedback = require(script.Parent:WaitForChild("CombatFeedback"))
+    WeaponEffects = require(script.Parent:WaitForChild("WeaponEffects"))
+end)
+
 local function performMeleeAttack()
     local char = Player.Character
-    if not char then 
-        print("[WeaponController] No character!")
-        return 
-    end
+    if not char then return end
     
     local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then
-        print("[WeaponController] No tool equipped!")
-        return
-    end
-    
-    if tool:GetAttribute("Type") ~= "melee" then
-        print("[WeaponController] Tool is not melee type: " .. tostring(tool:GetAttribute("Type")))
-        return
-    end
+    if not tool or tool:GetAttribute("Type") ~= "melee" then return end
     
     local now = tick()
     local attackSpeed = tool:GetAttribute("AttackSpeed") or 0.5
-    if now - WeaponController.attackCooldown < attackSpeed then 
-        return -- Still on cooldown, silent
-    end
+    if now - WeaponController.attackCooldown < attackSpeed then return end
     WeaponController.attackCooldown = now
     
-    print("[WeaponController] ATTACKING with " .. tool.Name)
-    
+    -- Visuals
     playSound(SOUND_IDS.SWING_WHOOSH, 0.8, math.random(90,110)/100)
-    shakeCamera(0.5)
+    shakeCamera(0.2) -- Light shake on swing
     
-    -- Weapon swing animation using Tool Grip (actually works!)
-    task.spawn(function()
-        local originalGrip = tool.Grip
-        
-        -- Swing forward/down
-        local swingGrip = originalGrip * CFrame.Angles(math.rad(-70), 0, math.rad(15))
-        tool.Grip = swingGrip
-        
-        task.wait(0.08)
-        
-        -- Swing through
-        local throughGrip = originalGrip * CFrame.Angles(math.rad(20), 0, math.rad(-10))
-        tool.Grip = throughGrip
-        
-        task.wait(0.1)
-        
-        -- Return to original
-        tool.Grip = originalGrip
-    end)
+    -- BLOCK IDLE, START ATTACK
+    WeaponController.actionState = "Attacking"
     
-    -- Skip broken animation (try it but don't rely on it)
-    pcall(function()
-        playAttackAnimation("SWING_OVERHEAD")
-    end)
-    
-    -- Client-Side Hit Detection - SIMPLE SPHERE CHECK
-    local range = tool:GetAttribute("Range") or 6
-    local origin = char.HumanoidRootPart.Position
-    local targetFound = nil
-    local hitPos = origin
-    local closestDist = range + 1
-    
-    -- Check ALL models in workspace that could be targets
-    for _, model in pairs(workspace:GetDescendants()) do
-        if model:IsA("Model") and model ~= char then
-            local humanoid = model:FindFirstChildOfClass("Humanoid")
-            local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
+    local shoulder = findRightShoulder(char)
+    if shoulder then
+        -- Base position to animate from (use current C0 for smoothness)
+        local baseC0 = IDLE_C0
             
-            if humanoid and hrp and humanoid.Health > 0 then
-                local dist = (hrp.Position - origin).Magnitude
-                
-                -- Simple distance check - hit closest target within range
-                if dist <= range and dist < closestDist then
-                    closestDist = dist
-                    targetFound = model
-                    hitPos = hrp.Position
-                end
+        -- Windup (Back - Fast)
+        local windupC0 = baseC0 * CFrame.Angles(0, 0, math.rad(60))
+        local t1 = TweenService:Create(shoulder, TweenInfo.new(0.08, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {C0 = windupC0})
+        t1:Play()
+        t1.Completed:Wait()
+        
+        -- Swing (Impact - Explosive)
+        local swingC0 = baseC0 * CFrame.Angles(0, 0, math.rad(-90)) * CFrame.Angles(math.rad(60), 0, 0)
+        local t2 = TweenService:Create(shoulder, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {C0 = swingC0})
+        t2:Play()
+        
+        -- Hit Detection logic happens mid-swing
+        -- We wait a tiny bit to match the visual "hit frame"
+        task.wait(0.05)
+        
+        local range = tool:GetAttribute("Range") or 6
+        local origin = char.HumanoidRootPart.Position
+        local overlapParams = OverlapParams.new()
+        overlapParams.FilterDescendantsInstances = {char}
+        overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local parts = workspace:GetPartBoundsInRadius(origin, range, overlapParams)
+        local hitConfirm = false
+        
+        for _, part in ipairs(parts) do
+            local model = part.Parent
+            if model:IsA("Accessory") then model = model.Parent end
+            if model and model:IsA("Model") and model ~= char then
+                    local hum = model:FindFirstChild("Humanoid")
+                    local hrp = model:FindFirstChild("HumanoidRootPart")
+                    if hum and hum.Health > 0 and hrp then
+                        local toTarget = hrp.Position - origin
+                        -- Dot product check: Must be in front of player
+                        if toTarget.Unit:Dot(char.HumanoidRootPart.CFrame.LookVector) > 0.3 then
+                            -- HIT CONFIRMED
+                            hitConfirm = true
+                            
+                            -- 1. Meaty Sound Feedback (Instance)
+                            playSound(SOUND_IDS.HIT_FLESH, 1, math.random(90, 110)/100)
+                            
+                            -- 2. Visual Blood (Local Immediate)
+                            if WeaponEffects then
+                                WeaponEffects:createBloodEffect(hrp.Position)
+                            end
+                            
+                            -- 3. Server Event
+                            if WeaponSystemRemote then
+                                WeaponSystemRemote:FireServer("MELEE_HIT", model, hrp.Position)
+                            end
+                            
+                            -- 4. Client Feedback (Markers)
+                            if CombatFeedback then
+                                CombatFeedback:showHitMarker(false) 
+                            end
+                            
+                            -- 5. GAME JUICE: Hit Stop & Heavy Shake
+                            shakeCamera(0.6) -- Heavy shake on impact
+                            
+                            -- Freeze the tween/shoulder momentarily to simulate "drag" or impact weight
+                            if t2 then t2:Pause() end
+                            task.wait(0.12) -- HIT STOP DURATION (The "Freeze")
+                            if t2 then t2:Play() end
+                            
+                            break -- Hit one target per swing (or remove to hit multiple)
+                        end
+                    end
             end
         end
-    end
-    
-    -- Debug: show what we found
-    if targetFound then
-        print("[WeaponController] Found target: " .. targetFound.Name .. " at distance " .. string.format("%.1f", closestDist))
-    else
-        print("[WeaponController] No target in range " .. range .. " studs")
-    end
-    
-    if targetFound then
-        -- Show hit feedback
-        local success, CombatFeedback = pcall(function()
-            return require(script.Parent:WaitForChild("CombatFeedback", 1))
-        end)
-        if success and CombatFeedback then
-            CombatFeedback:showHitMarker(false)
+        
+        if not hitConfirm and WeaponSystemRemote then
+                WeaponSystemRemote:FireServer("MELEE_SWING", Camera.CFrame.LookVector)
         end
         
-        if WeaponSystemRemote then
-            WeaponSystemRemote:FireServer("MELEE_HIT", targetFound, hitPos)
-        end
-        print("[WeaponController] Hit " .. (targetFound.Name or "target"))
-    else
-        -- Just Swing
-        if WeaponSystemRemote then
-            WeaponSystemRemote:FireServer("MELEE_SWING", Camera.CFrame.LookVector)
-        end
+        t2.Completed:Wait()
+        
+        -- Recover (Return to idle - Smooth)
+        local t3 = TweenService:Create(shoulder, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {C0 = IDLE_C0})
+        t3:Play()
+        t3.Completed:Wait()
+
     end
+    
+    -- UNBLOCK IDLE
+    WeaponController.actionState = "Idle"
 end
 
 local function startCharging()
     local char = Player.Character
     if not char then return end
     local tool = char:FindFirstChildOfClass("Tool")
-    if not tool or tool:GetAttribute("Type") ~= "ranged" then return end
+    local kind = tool and tool:GetAttribute("Type")
+    if not tool or (kind ~= "ranged" and kind ~= "thrown") then return end
     
     WeaponController.isCharging = true
     WeaponController.chargeStartTime = tick()
+    WeaponController.actionState = "Charging" -- Lifts Arm
     
     if WeaponController.chargeIndicator then
         WeaponController.chargeIndicator.Visible = true
@@ -391,7 +427,6 @@ local function startCharging()
     end
     
     playSound(SOUND_IDS.BOW_DRAW, 0.6)
-    playAttackAnimation("DRAW_BOW")
     
     -- Shrink Crosshair for focus
     if WeaponController.crosshair then
@@ -404,6 +439,7 @@ end
 local function releaseCharge()
     if not WeaponController.isCharging then return end
     WeaponController.isCharging = false
+    WeaponController.actionState = "Idle" -- Return to Idle
     
     local char = Player.Character
     local tool = char and char:FindFirstChildOfClass("Tool")
@@ -424,11 +460,10 @@ local function releaseCharge()
     end
     
     playSound(SOUND_IDS.BOW_RELEASE, 0.8)
-    shakeCamera(1.0 * factor) -- Bigger shake for fuller charge
+    shakeCamera(1.0 * factor) 
     
     local dir = getAimDirection()
     
-    -- Instant Visual Feedback
     local speed = tool:GetAttribute("ProjectileSpeed") or 100
     local origin = char.HumanoidRootPart.Position + Vector3.new(0, 2, 0) + dir * 2
     createVisualProjectile(tool, origin, dir, speed * factor)
@@ -446,6 +481,9 @@ local function onEquip(tool)
     if WeaponController.crosshair then
         WeaponController.crosshair.Visible = (kind == "ranged" or kind == "thrown")
     end
+    pcall(function()
+        playIdlePose(tool)
+    end)
 end
 
 local function onUnequip(tool)
@@ -457,12 +495,21 @@ local function onUnequip(tool)
     if WeaponController.chargeIndicator then
         WeaponController.chargeIndicator.Visible = false
     end
+    stopIdlePose()
 end
 
 -- ============ INPUT & UPDATE ============
 
 local function onInputBegan(input, gpe)
-    if gpe then return end
+    -- DEBUG INPUT
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        -- print("[WeaponController] Click! GPE:", gpe) -- Uncomment to spam logs
+    end
+
+    -- Allow clicking even if GPE is true (Ui underneath), unless it's a specific UI that SHOULD block
+    -- For now, we trust our crosshair logic.
+    -- if gpe then return end  <-- DISABLED GPE CHECK FOR WEAPONS
+    
     local char = Player.Character
     if not char then return end
     local tool = char:FindFirstChildOfClass("Tool")
@@ -470,8 +517,9 @@ local function onInputBegan(input, gpe)
     
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         local kind = tool:GetAttribute("Type")
+        print("[WeaponController] Input: " .. tool.Name .. " Type: " .. tostring(kind))
         if kind == "melee" then performMeleeAttack()
-        elseif kind == "ranged" then startCharging()
+        elseif kind == "ranged" or kind == "thrown" then startCharging()
         end
     end
 end

@@ -246,6 +246,63 @@ function MatchHUD.init()
             end
         end)
     end
+    
+    -- Connect to EventsRemote for storm updates
+    local eventsRemote = ReplicatedStorage:WaitForChild("EventsRemoteEvent", 5)
+    if eventsRemote then
+        eventsRemote.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
+            if eventType == "STORM_PHASE_ACTIVE" then
+                -- args: phase, radius, center, duration
+                local phase = args[1]
+                local duration = args[4] or 60
+                
+                if MatchHUD.zoneTitle then
+                    MatchHUD.zoneTitle.Text = "STORM PHASE " .. tostring(phase)
+                    MatchHUD.zoneTitle.TextColor3 = UITheme.Colors.Danger
+                    MatchHUD.zoneContainer.Visible = true
+                end
+                
+                -- Start local countdown
+                MatchHUD:startZoneTimer(duration)
+                
+                -- Flash screen red briefly
+                if MatchHUD.screenGui then
+                    local flash = Instance.new("Frame")
+                    flash.Size = UDim2.new(1,0,1,0)
+                    flash.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                    flash.BackgroundTransparency = 0.8
+                    flash.BorderSizePixel = 0
+                    flash.ZIndex = -1
+                    flash.Parent = MatchHUD.screenGui
+                    
+                    local tween = TweenService:Create(flash, TweenInfo.new(1), {BackgroundTransparency = 1})
+                    tween:Play()
+                    tween.Completed:Connect(function() flash:Destroy() end)
+                end
+            end
+        end)
+    end
+end
+
+-- New method to handle countdown
+function MatchHUD:startZoneTimer(duration)
+    MatchHUD.zoneTimeRemaining = duration
+    
+    if MatchHUD.timerConnection then MatchHUD.timerConnection:Disconnect() end
+    
+    local startTime = tick()
+    MatchHUD.timerConnection = RunService.Stepped:Connect(function()
+        local elapsed = tick() - startTime
+        local remaining = math.max(0, duration - elapsed)
+        
+        MatchHUD:updateZoneTimer(remaining, true)
+        
+        if remaining <= 0 then
+            if MatchHUD.timerConnection then MatchHUD.timerConnection:Disconnect() end
+            MatchHUD:updateZoneTimer(0, false)
+        end
+    end)
 end
 
 MatchHUD.init()

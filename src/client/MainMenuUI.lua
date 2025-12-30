@@ -134,14 +134,17 @@ local function createSidebar(parent)
         iconLabel.TextSize = 24
         iconLabel.Position = UDim2.new(0, 15, 0, 0)
         iconLabel.Parent = btn
+        
+        return btn
     end
     
     -- 1. PLAY (Primary)
-    addButton("PLAY", "⚔️", 1, UITheme.Colors.Success, function()
+    local playBtn = addButton("PLAY", "⚔️", 1, UITheme.Colors.Success, function()
         MainMenuUI:hide()
         local lobbyRemote = ReplicatedStorage:FindFirstChild("LobbyRemoteEvent")
         if lobbyRemote then lobbyRemote:FireServer("QUEUE_FOR_MATCH") end
     end)
+    playBtn.Name = "Button_Play"
     
     -- 2. BATTLE PASS
     addButton("BATTLE PASS", "🏆", 2, UITheme.Colors.Gold, function()
@@ -317,17 +320,83 @@ function MainMenuUI:hide()
     end
 end
 
+function MainMenuUI:updateCountdown(seconds)
+    if not MainMenuUI.screenGui then return end
+    
+    local sidebar = MainMenuUI.screenGui:FindFirstChild("Sidebar")
+    if not sidebar then return end
+    
+    -- Find nav container (it's the second frame usually, but let's assume it found via name Button_Play's parent if needed, or we just search recursively)
+    -- Since we named the button Button_Play, we can find it
+    local playBtn = nil
+    for _, desc in pairs(sidebar:GetDescendants()) do
+        if desc.Name == "Button_Play" then
+            playBtn = desc
+            break
+        end
+    end
+    
+    if playBtn then
+        local label = playBtn:FindFirstChild("TextLabel") -- The main text is likely the first textlabel or the one with text "PLAY"
+        -- Actually createButton usually puts text directly on button or in a label.
+        -- Looking at createButton in UITheme would confirm, but here let's just assume we can change the button text "PLAY" to "STARTING: X"
+        
+        -- In createSidebar: Text = "      " .. text
+        -- The button itself is a TextButton usually.
+        
+        if playBtn:IsA("TextButton") then
+            if seconds > 0 then
+                playBtn.Text = "      STARTING: " .. seconds
+            else
+                playBtn.Text = "      PLAY"
+            end
+        end
+    end
+end
+
 function MainMenuUI.init()
     print("[MainMenuUI] Initializing...")
     createUI()
     MainMenuUI:show()
     
-    -- Lobby Event Listeners
-    local lobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 10)
+    -- Listen for Lobby/Match updates
+    local lobbyRemote = ReplicatedStorage:FindFirstChild("LobbyRemoteEvent")
     if lobbyRemote then
-        lobbyRemote.OnClientEvent:Connect(function(eventType)
+        lobbyRemote.OnClientEvent:Connect(function(eventType, data)
             if eventType == "MATCH_STARTING" then
+                -- Create persistent transition curtain
+                local transitionGui = Instance.new("ScreenGui")
+                transitionGui.Name = "MatchTransition"
+                transitionGui.IgnoreGuiInset = true
+                transitionGui.DisplayOrder = 200 -- Above everything
+                transitionGui.ResetOnSpawn = false
+                transitionGui.Parent = PlayerGui
+                
+                local curtain = Instance.new("Frame")
+                curtain.Size = UDim2.new(1, 0, 1, 0)
+                curtain.BackgroundColor3 = Color3.new(0,0,0)
+                curtain.BackgroundTransparency = 1
+                curtain.Parent = transitionGui
+            
+                local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                local fadeIn = TweenService:Create(curtain, tweenInfo, {BackgroundTransparency = 0})
+                fadeIn:Play()
+                fadeIn.Completed:Wait()
+                
                 MainMenuUI:hide()
+                
+                -- Wait for teleport/spawn (server processing)
+                task.wait(1.5)
+                
+                -- Fade Out (Reveal Arena)
+                local fadeOut = TweenService:Create(curtain, tweenInfo, {BackgroundTransparency = 1})
+                fadeOut:Play()
+                
+                fadeOut.Completed:Connect(function()
+                    transitionGui:Destroy()
+                end)
+            elseif eventType == "COUNTDOWN_UPDATE" then
+                MainMenuUI:updateCountdown(data)
             end
         end)
     end
@@ -336,10 +405,10 @@ function MainMenuUI.init()
     local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
     if matchRemote then
         matchRemote.OnClientEvent:Connect(function(eventType)
-            if eventType == "MATCH_START" then
+            if eventType == "MATCH_START" or eventType == "MATCH_STARTED" then
                 MainMenuUI:hide()
-            elseif eventType == "MATCH_END" then
-                task.delay(5, function() MainMenuUI:show() end)
+            elseif eventType == "MATCH_END" or eventType == "RETURN_TO_LOBBY" then
+                task.delay(1, function() MainMenuUI:show() end)
             end
         end)
     end

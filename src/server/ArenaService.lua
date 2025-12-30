@@ -93,27 +93,23 @@ local function createCornucopia()
     ArenaService.cornucopiaModel = cornucopiaBase
 end
 
--- Spawn Loot (Simplified for new terrain)
+-- Spawn Loot (Using LootDistribution)
 function ArenaService:spawnCornucopiaLoot()
     if ArenaService.cornucopiaLootSpawned then return end
     
-    local items = {
-        "Sword", "Bow", "Spear", "Axe", "Medkit", "Backpack"
-    }
+    local success, LootDistribution = pcall(function()
+        return require(script.Parent.LootDistribution)
+    end)
     
-    for i = 1, 12 do
-        local angle = (i / 12) * math.pi * 2
-        local dist = 10
-        local pos = Vector3.new(math.cos(angle)*dist, 14, math.sin(angle)*dist) -- On platform
+    if success and LootDistribution then
+        -- Find the Cornucopia Pedestals
+        local mapBase = Workspace:FindFirstChild("MapBase")
+        local center = Vector3.new(0, 0, 0)
         
-        local part = Instance.new("Part")
-        part.Name = "Loot_" .. items[math.random(1, #items)]
-        part.Size = Vector3.new(2,2,2)
-        part.Position = pos
-        part.Anchored = true
-        part.CanCollide = false
-        part.Color = Color3.fromRGB(255, 215, 0) -- Gold Box placeholder
-        part.Parent = Workspace
+        -- If MapBase exists, use its pedestals, otherwise pass center
+        LootDistribution:spawnCornucopiaLoot(center)
+    else
+        warn("[ArenaService] Failed to load LootDistribution")
     end
     
     ArenaService.cornucopiaLootSpawned = true
@@ -121,43 +117,23 @@ function ArenaService:spawnCornucopiaLoot()
 end
 
 function ArenaService:spawnBiomeLoot()
-    -- Spawn random spread loot across biomes
-    for _, biome in ipairs(ArenaService.biomeZones) do
-        if biome.type ~= "cornucopia" then
-            local count = math.random(5, 10)
-            for i = 1, count do
-                local theta = math.random() * 2 * math.pi
-                local r = math.sqrt(math.random()) * (biome.radius * 0.8)
-                local x = biome.center.X + r * math.cos(theta)
-                local z = biome.center.Z + r * math.sin(theta)
-                
-                -- Raycast down to find ground
-                local rayOrigin = Vector3.new(x, 150, z)
-                local rayDir = Vector3.new(0, -200, 0)
-                local result = Workspace:Raycast(rayOrigin, rayDir)
-                
-                if result then
-                    local groundPos = result.Position
-                    if result.Instance.Name ~= "Water" then -- Avoid underwater loot if possible
-                         local box = Instance.new("Part")
-                         box.Name = "BiomeLoot"
-                         box.Size = Vector3.new(2, 2, 2)
-                         box.Position = groundPos + Vector3.new(0, 1, 0)
-                         box.Anchored = true
-                         box.CanCollide = false
-                         box.Color = Color3.fromRGB(150, 150, 150)
-                         box.Material = Enum.Material.Wood
-                         box.Parent = Workspace
-                    end
-                end
-            end
-        end
+    local success, LootDistribution = pcall(function()
+        return require(script.Parent.LootDistribution)
+    end)
+    
+    if success and LootDistribution then
+        local arenaSize = 1000 -- Should match Config
+        LootDistribution:spawnGroundLoot(arenaSize)
+    else
+        warn("[ArenaService] Failed to load LootDistribution for Biome Loot")
     end
-    print("[ArenaService] Biome Loot Spawned via Raycast")
+    
+    print("[ArenaService] Biome Loot Spawned via LootDistribution")
 end
 
 function ArenaService:initializeMatch()
-    if ArenaService.arenaSetupComplete then return end
+    -- arenaSetupComplete just means the map geometry is ready. 
+    -- We still need to spawn dynamic content for the match.
     ArenaService:spawnCornucopiaLoot()
     ArenaService:spawnBiomeLoot()
     arenaRemoteEvent:FireAllClients("ARENA_INITIALIZED")

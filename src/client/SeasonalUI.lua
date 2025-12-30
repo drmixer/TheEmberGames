@@ -694,11 +694,11 @@ function SeasonalUI.init()
                 
             elseif eventType == "REWARD_UNLOCKED" then
                 -- Show reward unlock notification
-                playSound("rbxassetid://9046240113", 0.6)
+                playSound("rbxassetid://12222058", 0.6)
                 print("[SeasonalUI] Unlocked: " .. data.reward.name)
                 
             elseif eventType == "CHALLENGE_COMPLETED" then
-                playSound("rbxassetid://9046239626", 0.5)
+                playSound("rbxassetid://138084889", 0.5)
                 print("[SeasonalUI] Challenge completed: " .. data.challenge.description)
             end
         end)

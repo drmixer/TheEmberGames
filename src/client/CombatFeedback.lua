@@ -13,8 +13,8 @@ local PlayerGui = Player:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
 -- Wait for combat remote events
-local DamageRemoteEvent = ReplicatedStorage:WaitForChild("DamageRemoteEvent", 10)
-local WeaponRemoteEvent = ReplicatedStorage:WaitForChild("WeaponRemoteEvent", 10)
+local DamageRemoteEvent = ReplicatedStorage:FindFirstChild("DamageRemoteEvent") or Instance.new("RemoteEvent")
+local WeaponRemoteEvent = ReplicatedStorage:FindFirstChild("WeaponRemoteEvent") or Instance.new("RemoteEvent")
 
 local CombatFeedback = {}
 CombatFeedback.screenGui = nil
@@ -33,6 +33,24 @@ local CONFIG = {
     CRITICAL_SHAKE_MULTIPLIER = 2,
     VIGNETTE_DURATION = 0.8,
 }
+
+-- Sounds
+local SOUNDS = {
+    HIT = "rbxassetid://12222084", -- Classic Hit
+    CRITICAL = "rbxassetid://12222005", -- Classic Heavy Hit
+    SWING = "rbxassetid://12222216" -- Classic Sword Slash
+}
+
+-- Helper to play local sound
+local function playLocalSound(soundId, pitch)
+    local s = Instance.new("Sound")
+    s.SoundId = soundId
+    s.Volume = 0.8
+    s.PlaybackSpeed = pitch or 1
+    s.Parent = workspace
+    s.PlayOnRemove = true
+    s:Destroy()
+end
 
 -- Create the screen GUI
 local function createScreenGui()
@@ -189,12 +207,21 @@ function CombatFeedback:showHitMarker(isCritical)
     local startSize = isCritical and 1.3 or 1
     hitMarker.Size = UDim2.new(0, CONFIG.HIT_MARKER_SIZE * startSize, 0, CONFIG.HIT_MARKER_SIZE * startSize)
     hitMarker.Position = UDim2.new(0.5, -CONFIG.HIT_MARKER_SIZE * startSize/2, 0.5, -CONFIG.HIT_MARKER_SIZE * startSize/2)
+    hitMarker.Rotation = math.random(-20, 20)
+    
+    -- Play Sound
+    if isCritical then
+        playLocalSound(SOUNDS.CRITICAL, 1.1)
+    else
+        playLocalSound(SOUNDS.HIT, math.random(95, 115)/100)
+    end
     
     -- Shrink and fade out
-    local tweenInfo = TweenInfo.new(CONFIG.HIT_MARKER_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(CONFIG.HIT_MARKER_DURATION, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     local tween = TweenService:Create(hitMarker, tweenInfo, {
-        Size = UDim2.new(0, CONFIG.HIT_MARKER_SIZE * 0.8, 0, CONFIG.HIT_MARKER_SIZE * 0.8),
-        Position = UDim2.new(0.5, -CONFIG.HIT_MARKER_SIZE * 0.4, 0.5, -CONFIG.HIT_MARKER_SIZE * 0.4)
+        Size = UDim2.new(0, CONFIG.HIT_MARKER_SIZE * 0.5, 0, CONFIG.HIT_MARKER_SIZE * 0.5),
+        Position = UDim2.new(0.5, -CONFIG.HIT_MARKER_SIZE * 0.25, 0.5, -CONFIG.HIT_MARKER_SIZE * 0.25),
+        Rotation = 0
     })
     tween:Play()
     
@@ -210,7 +237,7 @@ function CombatFeedback:showDamageNumber(targetPosition, damage, isCritical)
     local billboardPart = Instance.new("Part")
     billboardPart.Name = "DamageNumberAnchor"
     billboardPart.Size = Vector3.new(0.1, 0.1, 0.1)
-    billboardPart.Position = targetPosition + Vector3.new(math.random(-2, 2), 3, math.random(-2, 2))
+    billboardPart.Position = targetPosition + Vector3.new(math.random(-2, 2)/2, 3, math.random(-2, 2)/2)
     billboardPart.Anchored = true
     billboardPart.CanCollide = false
     billboardPart.Transparency = 1
@@ -233,6 +260,7 @@ function CombatFeedback:showDamageNumber(targetPosition, damage, isCritical)
     if isCritical then
         damageLabel.TextColor3 = Color3.fromRGB(255, 200, 0) -- Gold for critical
         damageLabel.Text = "💥 " .. tostring(math.floor(damage)) .. "!"
+        damageLabel.Rotation = math.random(-15, 15)
     else
         damageLabel.TextColor3 = Color3.fromRGB(255, 80, 80) -- Red for normal
     end
@@ -361,6 +389,50 @@ function CombatFeedback:onDealDamage(targetPosition, damage, isCritical)
     
     -- Show floating damage number
     CombatFeedback:showDamageNumber(targetPosition, damage, isCritical)
+    
+    -- Critical Hit Juice
+    if isCritical then
+        CombatFeedback:flashScreen(Color3.new(1, 1, 1), 0.1) -- White flash
+        CombatFeedback:hitStop(0.05) -- Brief pause/freeze
+        CombatFeedback:shakeScreen(0.5, 0.2) -- Extra shake
+    end
+end
+
+-- Create a flash effect overlay
+function CombatFeedback:flashScreen(color, duration)
+    local flash = Instance.new("Frame")
+    flash.Name = "FlashOverlay"
+    flash.Size = UDim2.new(1, 0, 1, 0)
+    flash.BackgroundColor3 = color
+    flash.BackgroundTransparency = 0.6
+    flash.BorderSizePixel = 0
+    flash.Parent = CombatFeedback.screenGui
+    
+    game:GetService("Debris"):AddItem(flash, duration)
+    
+    TweenService:Create(flash, TweenInfo.new(duration), {BackgroundTransparency = 1}):Play()
+end
+
+-- Simulate hit stop (brief freeze)
+function CombatFeedback:hitStop(duration)
+    -- We can't easily pause the engine, but we can pause character animations
+    -- for a split second to simulate impact weight
+    task.spawn(function()
+        local char = Player.Character
+        local animator = char and char:FindFirstChild("Humanoid") and char.Humanoid:FindFirstChild("Animator")
+        
+        if animator then
+            for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                track:AdjustSpeed(0)
+            end
+            
+            task.wait(duration)
+            
+            for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                track:AdjustSpeed(1)
+            end
+        end
+    end)
 end
 
 -- Initialize combat feedback system

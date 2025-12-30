@@ -11,16 +11,19 @@ local TweenService = game:GetService("TweenService")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local Config = require(ReplicatedFirst:WaitForChild("Config"))
+
 local Minimap = {}
-Minimap.isMinimized = true
 Minimap.markers = {}
-Minimap.zoneRadius = 200
+Minimap.zoneRadius = Config.ARENA_SIZE / 2
 Minimap.zoneShrinking = false
+Minimap.isMinimized = true
 
 local CONFIG = {
-    MINIMAP_SIZE = 150,
+    MINIMAP_SIZE = 200, -- Increased from 150
     FULLMAP_SIZE = 400,
-    ARENA_RADIUS = 250, -- Arena world size
+    ARENA_RADIUS = Config.ARENA_SIZE / 2, -- Correct arena radius from Config (512)
     ACCENT_COLOR = Color3.fromRGB(212, 175, 55),
     BG_COLOR = Color3.fromRGB(20, 20, 30),
     PLAYER_COLOR = Color3.fromRGB(255, 255, 255),
@@ -89,14 +92,15 @@ local function createUI()
     -- Zone circle (represents safe zone)
     local zoneCircle = Instance.new("Frame")
     zoneCircle.Name = "ZoneCircle"
-    zoneCircle.Size = UDim2.new(0.8, 0, 0.8, 0)
-    zoneCircle.Position = UDim2.new(0.1, 0, 0.1, 0)
+    zoneCircle.Size = UDim2.new(1, 0, 1, 0) -- Start full size
+    zoneCircle.Position = UDim2.new(0, 0, 0, 0)
     zoneCircle.BackgroundTransparency = 1
+    zoneCircle.Visible = false -- Hide until active
     zoneCircle.Parent = mapBg
     
     local zoneStroke = Instance.new("UIStroke")
     zoneStroke.Color = CONFIG.ZONE_COLOR
-    zoneStroke.Thickness = 2
+    zoneStroke.Thickness = 3 -- Thicker line
     zoneStroke.Parent = zoneCircle
     
     local zoneCorner = Instance.new("UICorner")
@@ -108,7 +112,7 @@ local function createUI()
     dangerOverlay.Name = "DangerOverlay"
     dangerOverlay.Size = UDim2.new(1, 0, 1, 0)
     dangerOverlay.BackgroundColor3 = CONFIG.ZONE_COLOR
-    dangerOverlay.BackgroundTransparency = 0.8
+    dangerOverlay.BackgroundTransparency = 1 -- Hide for now, logic not fully implemented for hole punch
     dangerOverlay.BorderSizePixel = 0
     dangerOverlay.ZIndex = 1
     dangerOverlay.Parent = mapBg
@@ -178,6 +182,20 @@ local function createUI()
     toggleHint.TextSize = 10
     toggleHint.Font = Enum.Font.Gotham
     toggleHint.Parent = mapContainer
+
+    -- Damage Indicator
+    local damageLabel = Instance.new("TextLabel")
+    damageLabel.Name = "DamageLabel"
+    damageLabel.Size = UDim2.new(1, 0, 0, 20)
+    damageLabel.Position = UDim2.new(0, 0, 0, -25) -- Higher above map
+    damageLabel.BackgroundTransparency = 1
+    damageLabel.Text = "" -- Hidden by default
+    damageLabel.TextColor3 = Color3.fromRGB(255, 80, 80) -- Bright Red/Orange
+    damageLabel.TextSize = 16 -- Larger
+    damageLabel.Font = Enum.Font.GothamBlack -- Thicker font
+    damageLabel.TextStrokeTransparency = 0 -- Black outline
+    damageLabel.TextStrokeColor3 = Color3.new(0,0,0)
+    damageLabel.Parent = mapContainer
     
     -- Markers container
     local markersContainer = Instance.new("Folder")
@@ -191,7 +209,11 @@ local function createUI()
     Minimap.directionIndicator = directionIndicator
     Minimap.zoneCircle = zoneCircle
     Minimap.markersContainer = markersContainer
+    Minimap.zoneCircle = zoneCircle
+    Minimap.markersContainer = markersContainer
     Minimap.toggleHint = toggleHint
+    Minimap.damageLabel = damageLabel
+    Minimap.mapBg = mapBg -- Added to table for access
 end
 
 -- Update player position on minimap
@@ -247,15 +269,50 @@ function Minimap:removeMarker(id)
 end
 
 -- Update zone
-function Minimap:updateZone(radius, center)
-    Minimap.zoneRadius = radius
+function Minimap:updateZone(targetRadius, center, duration, startRadius, damage)
+    Minimap.zoneRadius = targetRadius
+    duration = duration or 1
+    Minimap.zoneCircle.Visible = true -- Show when active
     
-    local mapScale = radius / CONFIG.ARENA_RADIUS
-    local size = mapScale * 0.8
+    -- Update damage text
+    if damage and damage > 0 then
+        Minimap.damageLabel.Text = string.format("STORM DAMAGE: %d HP/s", damage)
+        Minimap.damageLabel.Visible = true
+        
+        -- Flash effect
+        task.spawn(function()
+            local t = 0
+            while Minimap.damageLabel.Visible do
+                t = t + 0.1
+                local scale = 1 + math.sin(t*5)*0.1
+                Minimap.damageLabel.TextSize = 16 * scale
+                task.wait(0.05)
+            end
+        end)
+    else
+        Minimap.damageLabel.Visible = false
+    end
+
+    local function getScale(r)
+        -- Linear scale: Radius / MaxRadius
+        -- Since map is 2*MaxRadius width, and circle size is relative to map size (0..1)
+        -- Size = (2*r) / (2*MaxRadius) = r / MaxRadius
+        return math.clamp(r / CONFIG.ARENA_RADIUS, 0, 1)
+    end
     
-    TweenService:Create(Minimap.zoneCircle, TweenInfo.new(1), {
-        Size = UDim2.new(size, 0, size, 0),
-        Position = UDim2.new(0.5 - size/2, 0, 0.5 - size/2, 0)
+    local targetSize = getScale(targetRadius)
+    
+    -- Snap to start size if provided (for smooth shrinking)
+    if startRadius then
+        local startSize = getScale(startRadius)
+        Minimap.zoneCircle.Size = UDim2.new(startSize, 0, startSize, 0)
+        Minimap.zoneCircle.Position = UDim2.new(0.5 - startSize/2, 0, 0.5 - startSize/2, 0)
+    end
+    
+    -- Tween to target size
+    TweenService:Create(Minimap.zoneCircle, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+        Size = UDim2.new(targetSize, 0, targetSize, 0),
+        Position = UDim2.new(0.5 - targetSize/2, 0, 0.5 - targetSize/2, 0)
     }):Play()
 end
 
@@ -293,6 +350,7 @@ function Minimap.init()
     print("[Minimap] Initializing...")
     
     createUI()
+    Minimap:hide() -- Hide initially (lobby only)
     
     -- Update position every frame
     RunService.RenderStepped:Connect(updatePlayerPosition)
@@ -309,12 +367,47 @@ function Minimap.init()
     local matchRemote = ReplicatedStorage:FindFirstChild("MatchRemoteEvent")
     if matchRemote then
         matchRemote.OnClientEvent:Connect(function(eventType, data)
-            if eventType == "ZONE_UPDATE" then
-                Minimap:updateZone(data.radius, data.center)
-            elseif eventType == "SUPPLY_DROP" then
-                Minimap:addMarker("supply_" .. data.id, data.position, "📦")
-            elseif eventType == "MATCH_START" then
+            if eventType == "MATCH_START" then
                 Minimap:show()
+            end
+        end)
+    end
+    
+    -- Listen for Lobby/Countdown events to show Map early (during tube rise)
+    local lobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 5)
+    if lobbyRemote then
+        lobbyRemote.OnClientEvent:Connect(function(eventType, ...)
+            if eventType == "COUNTDOWN_START" or eventType == "MATCH_STARTING" then
+                Minimap:show()
+            elseif eventType == "COUNTDOWN_CANCELLED" or eventType == "LOBBY_RETURN" then
+                Minimap:hide()
+            end
+        end)
+    else
+        warn("[Minimap] LobbyRemoteEvent not found!")
+    end
+    
+    local eventsRemote = ReplicatedStorage:WaitForChild("EventsRemoteEvent", 10)
+    if eventsRemote then
+        eventsRemote.OnClientEvent:Connect(function(eventType, ...)
+            local args = {...}
+            if eventType == "STORM_PHASE_ACTIVE" then
+                -- args: phase, targetRadius, center, duration, startRadius, damage
+                local targetRadius = args[2]
+                local center = args[3]
+                local duration = args[4] or 1
+                local startRadius = args[5]
+                local damage = args[6]
+                
+                Minimap:updateZone(targetRadius, center, duration, startRadius, damage)
+            elseif eventType == "SUPPLY_DROP_DEPLOYED" then
+                -- args: position, dropId
+                local position = args[1]
+                local dropId = args[2]
+                Minimap:addMarker("supply_" .. dropId, position, "📦", Color3.fromRGB(255, 215, 0))
+            elseif eventType == "SUPPLY_DROP_CLEANUP" then
+                local dropId = args[1]
+                Minimap:removeMarker("supply_" .. dropId)
             end
         end)
     end

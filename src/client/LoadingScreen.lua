@@ -287,6 +287,50 @@ function LoadingScreen.init()
         task.wait(1)
         LoadingScreen:hide()
     end)
+    
+    -- MATCH TRANSITION HANDLING
+    -- 1. Show Screen when Match Starts
+    -- MATCH TRANSITION HANDLING
+    -- 1. Show Screen when Match Starts
+    task.spawn(function()
+        local LobbyRemote = ReplicatedStorage:WaitForChild("LobbyRemoteEvent", 30)
+        if LobbyRemote then
+            LobbyRemote.OnClientEvent:Connect(function(action, ...)
+                if action == "MATCH_STARTING" then
+                    -- Re-create and show screen
+                    LoadingScreen.isLoading = true
+                    createLoadingScreen()
+                    LoadingScreen:updateProgress(0.2, "PREPARING ARENA...")
+                    task.spawn(cycleTips)
+                    
+                    -- Fake progress while waiting
+                    task.spawn(function()
+                        local p = 0.2
+                        while LoadingScreen.isLoading and p < 0.9 do
+                            p = p + 0.05
+                            LoadingScreen:updateProgress(p)
+                            task.wait(0.5)
+                        end
+                    end)
+                end
+            end)
+        end
+    end)
+
+    -- 2. Hide Screen when Player is Spawned (Camera Reset)
+    task.spawn(function()
+        local SpawnerRemote = ReplicatedStorage:WaitForChild("SpawnerRemoteEvent", 30)
+        if SpawnerRemote then
+            SpawnerRemote.OnClientEvent:Connect(function(action)
+                if action == "RESET_CAMERA" then
+                    -- Complete the bar and hide
+                    LoadingScreen:updateProgress(1, "READY!")
+                    task.wait(0.5)
+                    LoadingScreen:hide()
+                end
+            end)
+        end
+    end)
 end
 
 LoadingScreen.init()

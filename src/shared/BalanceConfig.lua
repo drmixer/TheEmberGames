@@ -7,25 +7,25 @@ local BalanceConfig = {}
 -- ============ SURVIVAL BALANCE ============
 
 BalanceConfig.Survival = {
-    -- Hunger settings (TUNED for balanced gameplay)
-    HUNGER_DRAIN_ACTIVE = 1/300,     -- Drain per second when active (~0.33% per minute, ~5 min to deplete)
-    HUNGER_DRAIN_IDLE = 1/600,       -- Drain per second when idle (~0.17% per minute, ~10 min idle)
+    -- Hunger settings (TUNED for balanced gameplay - 20 min match)
+    HUNGER_DRAIN_ACTIVE = 1/12,      -- 1 point every 12 seconds (~5/min). Needs ~2 meals per match.
+    HUNGER_DRAIN_IDLE = 1/24,        -- 1 point every 24 seconds (~2.5/min).
     HUNGER_CRITICAL = 25,            -- HP drain starts below this
     HUNGER_HEALTHY = 50,             -- Regen starts above this
     
-    -- Thirst settings (TUNED - thirst drains slightly faster than hunger)
-    THIRST_DRAIN_ACTIVE = 1/240,     -- Drain per second when active (~0.42% per minute, ~4 min to deplete)
-    THIRST_DRAIN_IDLE = 1/480,       -- Drain per second when idle (~0.21% per minute, ~8 min idle)
+    -- Thirst settings (TUNED - thirst is more urgent)
+    THIRST_DRAIN_ACTIVE = 1/8,       -- 1 point every 8 seconds (~7.5/min). Needs ~3 drinks per match.
+    THIRST_DRAIN_IDLE = 1/16,        -- 1 point every 16 seconds (~3.75/min).
     THIRST_CRITICAL = 25,            -- HP drain starts below this
     THIRST_HEALTHY = 50,             -- Regen starts above this
     
     -- Health regeneration (TUNED)
-    HEALTH_REGEN_RATE = 0.5,         -- HP per second when healthy (full heal in ~200s if fed)
-    HEALTH_DRAIN_RATE = 1.0,         -- HP per second when starving/dehydrated (death in 100s)
+    HEALTH_REGEN_RATE = 1.0,         -- 1 HP per second when healthy (Full heal in 100s)
+    HEALTH_DRAIN_RATE = 2.0,         -- 2 HP per second when starving (Quick death in 50s)
     
-    -- Reference: 20 minute matches
-    -- Hunger: Depletes in ~5 min active, need to eat 4x per match
-    -- Thirst: Depletes in ~4 min active, need to drink 5x per match
+    -- Reference: 20 minute match (1200 seconds)
+    -- Hunger: 1200s / 12s = 100 points lost (Full bar)
+    -- Thirst: 1200s / 8s = 150 points lost (1.5 Bars)
 }
 
 -- ============ WEAPON DAMAGE BALANCE ============
@@ -225,6 +225,42 @@ BalanceConfig.Match = {
     
     -- Victory
     VICTORY_SCREEN_DURATION = 15,    -- 15 seconds before returning to lobby
+}
+
+-- ============ CONSUMABLES BALANCE ============
+
+BalanceConfig.Consumables = {
+    Apple = {
+        hunger = 20,
+        thirst = 10,
+        health = 5,
+        duration = 1.5, -- Time to eat
+        animation = "Eat",
+        sound = "rbxassetid://160212768", -- Crunch
+    },
+    Bread = {
+        hunger = 40,
+        thirst = -5, -- Dry
+        health = 10,
+        duration = 2,
+        animation = "Eat",
+        sound = "rbxassetid://160212768",
+    },
+    WaterBottle = {
+        hunger = 0,
+        thirst = 50,
+        health = 0,
+        duration = 2,
+        animation = "Drink",
+        sound = "rbxassetid://4765792476", -- Slurp
+    },
+    Medkit = {
+        hunger = 0,
+        thirst = 0,
+        health = 75,
+        duration = 4,
+        animation = "Bandage",
+    },
 }
 
 -- ============ CRAFTING BALANCE ============

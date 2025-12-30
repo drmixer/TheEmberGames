@@ -60,12 +60,47 @@ local function playSound(soundId, volume, parent)
     return sound
 end
 
+-- Helper to find safe ground Y, ignoring sky lobby
+local function getSafeGroundY(x, z, startHeight)
+    startHeight = startHeight or 250 -- Start below potential sky lobby
+    
+    local rayOrigin = Vector3.new(x, startHeight, z)
+    local rayDir = Vector3.new(0, -500, 0)
+    
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    -- Try to exclude Lobby and specific sky parts if found
+    local exclusions = {
+        workspace:FindFirstChild("Lobby"), 
+        workspace:FindFirstChild("SkyPlatform"),
+        workspace:FindFirstChild("LobbySpawn") -- Added correct name
+    } 
+    rayParams.FilterDescendantsInstances = exclusions
+    
+    local rayResult = workspace:Raycast(rayOrigin, rayDir, rayParams)
+    
+    if rayResult then
+        -- Double check height - if it's remarkably high (>150), it might still be a sky platform we missed
+        if rayResult.Position.Y > 150 then
+            print("[SupplyDropVisuals] Raycast hit high object: " .. rayResult.Instance.Name .. " at Y=" .. rayResult.Position.Y .. ". Ignoring.")
+            -- Try casting deeper or just fallback
+            return 5 -- Fallback to low ground
+        end
+        return rayResult.Position.Y
+    end
+    
+    return 5 -- Fallback
+end
+
 -- Create landing zone indicator (circle on ground)
 local function createLandingIndicator(position)
+    -- Align indicator with ground
+    local groundY = getSafeGroundY(position.X, position.Z)
+
     local indicator = Instance.new("Part")
     indicator.Name = "LandingIndicator"
     indicator.Size = Vector3.new(15, 0.2, 15)
-    indicator.Position = Vector3.new(position.X, 2, position.Z)
+    indicator.Position = Vector3.new(position.X, groundY + 0.5, position.Z)
     indicator.Anchored = true
     indicator.CanCollide = false
     indicator.Material = Enum.Material.Neon
@@ -118,7 +153,7 @@ local function createParachute(cratePosition)
         local stringPart = Instance.new("Part")
         stringPart.Name = "String" .. i
         stringPart.Size = Vector3.new(0.1, 8, 0.1)
-        stringPart.Material = Enum.Material.Rope
+        stringPart.Material = Enum.Material.Fabric -- Changed from Rope (invalid enum) to Fabric
         stringPart.Color = Color3.fromRGB(139, 90, 43) -- Rope color
         stringPart.Anchored = true
         stringPart.CanCollide = false
@@ -310,13 +345,279 @@ local function animateDropFall(dropId, startPosition, endPosition, callback)
     return fallConnection
 end
 
+-- Helper to find safe ground Y, ignoring sky lobby
+local function getSafeGroundY(x, z, startHeight)
+    startHeight = startHeight or 250 -- Start below potential sky lobby
+    
+    local rayOrigin = Vector3.new(x, startHeight, z)
+    local rayDir = Vector3.new(0, -500, 0)
+    
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    -- Try to exclude Lobby and specific sky parts if found
+    local exclusions = {
+        workspace:FindFirstChild("Lobby"), 
+        workspace:FindFirstChild("SkyPlatform"),
+        workspace:FindFirstChild("LobbySpawn")
+    } 
+    rayParams.FilterDescendantsInstances = exclusions
+    
+    local rayResult = workspace:Raycast(rayOrigin, rayDir, rayParams)
+    
+    if rayResult then
+        -- Double check height - if it's remarkably high (>150), it might still be a sky platform we missed
+        if rayResult.Position.Y > 150 then
+            print("[SupplyDropVisuals] Raycast hit high object: " .. rayResult.Instance.Name .. " at Y=" .. rayResult.Position.Y .. ". Ignoring.")
+            -- Try casting deeper or just fallback
+            return 5 -- Fallback to low ground
+        end
+        return rayResult.Position.Y
+    end
+    
+    return 5 -- Fallback
+end
+
+-- Create landing zone indicator (circle on ground)
+local function createLandingIndicator(position)
+    -- Align indicator with ground
+    local groundY = getSafeGroundY(position.X, position.Z)
+
+    local indicator = Instance.new("Part")
+    indicator.Name = "LandingIndicator"
+    indicator.Size = Vector3.new(15, 0.2, 15)
+    indicator.Position = Vector3.new(position.X, groundY + 0.5, position.Z)
+    indicator.Anchored = true
+    indicator.CanCollide = false
+    indicator.Material = Enum.Material.Neon
+    indicator.Color = Color3.fromRGB(255, 200, 50)
+    indicator.Transparency = 0.3
+    indicator.Shape = Enum.PartType.Cylinder
+    indicator.Orientation = Vector3.new(0, 0, 90)
+    indicator.Parent = workspace
+    
+    -- Pulsing animation
+    local pulseConnection
+    local pulseTime = 0
+    pulseConnection = RunService.Heartbeat:Connect(function(dt)
+        if not indicator or not indicator.Parent then
+            pulseConnection:Disconnect()
+            return
+        end
+        
+        pulseTime = pulseTime + dt
+        local pulse = math.sin(pulseTime * 4) * 0.3 + 0.5
+        indicator.Transparency = pulse
+        
+        -- Rotate slowly
+        indicator.CFrame = indicator.CFrame * CFrame.Angles(0, dt * 0.5, 0)
+    end)
+    
+    return indicator
+end
+
+-- Create supply crate
+local function createSupplyCrate(position, crateId)
+    local crate = Instance.new("Model")
+    crate.Name = "SupplyCrate_" .. (crateId or "unknown")
+    
+    -- Main crate body
+    local body = Instance.new("Part")
+    body.Name = "Body"
+    body.Size = CONFIG.CRATE_SIZE
+    body.Position = position
+    body.Anchored = true
+    body.CanCollide = true
+    body.Material = Enum.Material.Metal
+    body.Color = Color3.fromRGB(60, 60, 70) -- Dark metal
+    body.Parent = crate
+    
+    -- Lid (separate part for opening animation)
+    local lid = Instance.new("Part")
+    lid.Name = "Lid"
+    lid.Size = Vector3.new(CONFIG.CRATE_SIZE.X, 0.3, CONFIG.CRATE_SIZE.Z)
+    lid.Position = position + Vector3.new(0, CONFIG.CRATE_SIZE.Y / 2 + 0.15, 0)
+    lid.Anchored = true
+    lid.CanCollide = false
+    lid.Material = Enum.Material.Metal
+    lid.Color = Color3.fromRGB(80, 80, 90)
+    lid.Parent = crate
+    
+    -- Add golden accents
+    local accent1 = Instance.new("Part")
+    accent1.Name = "Accent1"
+    accent1.Size = Vector3.new(CONFIG.CRATE_SIZE.X + 0.2, 0.3, 0.3)
+    accent1.Position = position + Vector3.new(0, 0, CONFIG.CRATE_SIZE.Z / 2)
+    accent1.Anchored = true
+    accent1.CanCollide = false
+    accent1.Material = Enum.Material.Metal
+    accent1.Color = Color3.fromRGB(212, 175, 55)
+    accent1.Parent = crate
+    
+    local accent2 = accent1:Clone()
+    accent2.Name = "Accent2"
+    accent2.Position = position + Vector3.new(0, 0, -CONFIG.CRATE_SIZE.Z / 2)
+    accent2.Parent = crate
+    
+    -- Capitol symbol on lid
+    local symbol = Instance.new("Part")
+    symbol.Name = "Symbol"
+    symbol.Size = Vector3.new(2, 0.1, 2)
+    symbol.Position = position + Vector3.new(0, CONFIG.CRATE_SIZE.Y / 2 + 0.25, 0)
+    symbol.Anchored = true
+    symbol.CanCollide = false
+    symbol.Material = Enum.Material.Neon
+    symbol.Color = Color3.fromRGB(212, 175, 55)
+    symbol.Shape = Enum.PartType.Cylinder
+    symbol.Orientation = Vector3.new(0, 0, 90)
+    symbol.Parent = crate
+    
+    -- Glowing effect
+    local pointLight = Instance.new("PointLight")
+    pointLight.Color = Color3.fromRGB(255, 200, 100)
+    pointLight.Brightness = 2
+    pointLight.Range = 15
+    pointLight.Parent = symbol
+    
+    crate.PrimaryPart = body
+    crate.Parent = workspace
+    
+    return crate
+end
+
+-- Create vertical beacon
+local function createBeacon(position)
+    local beacon = Instance.new("Part")
+    beacon.Name = "SupplyBeacon"
+    beacon.Size = Vector3.new(1, CONFIG.BEACON_HEIGHT, 1)
+    beacon.Position = position + Vector3.new(0, CONFIG.BEACON_HEIGHT / 2, 0)
+    beacon.Anchored = true
+    beacon.CanCollide = false
+    beacon.Material = Enum.Material.Neon
+    beacon.Color = Color3.fromRGB(255, 200, 50)
+    beacon.Transparency = 0.5
+    beacon.Parent = workspace
+    
+    -- Animate beacon
+    local beaconTime = 0
+    local beaconConnection
+    beaconConnection = RunService.Heartbeat:Connect(function(dt)
+        if not beacon or not beacon.Parent then
+            beaconConnection:Disconnect()
+            return
+        end
+        
+        beaconTime = beaconTime + dt
+        beacon.Transparency = 0.3 + math.sin(beaconTime * 3) * 0.3
+    end)
+    
+    return beacon
+end
+
+-- Animate supply drop falling
+local function animateDropFall(dropId, startPosition, endPosition, callback)
+    local drop = SupplyDropVisuals.activeDrops[dropId]
+    if not drop then return end
+    
+    local duration = CONFIG.DROP_DURATION
+    local startTime = tick()
+    
+    local fallConnection
+    fallConnection = RunService.Heartbeat:Connect(function()
+        local elapsed = tick() - startTime
+        local progress = math.min(elapsed / duration, 1)
+        
+        -- Ease out for realistic parachute slowdown
+        local easedProgress = 1 - math.pow(1 - progress, 2)
+        
+        local currentPosition = startPosition:Lerp(endPosition, easedProgress)
+        
+        -- Update crate position
+        if drop.crate and drop.crate.PrimaryPart then
+            drop.crate:SetPrimaryPartCFrame(CFrame.new(currentPosition))
+        end
+        
+        -- Update parachute position
+        if drop.parachute then
+            local canopy = drop.parachute:FindFirstChild("Canopy")
+            if canopy then
+                canopy.Position = currentPosition + Vector3.new(0, 6, 0)
+            end
+            
+            -- Update strings
+            for i = 1, 6 do
+                local stringPart = drop.parachute:FindFirstChild("String" .. i)
+                if stringPart then
+                    local angle = (i - 1) * (math.pi * 2 / 6)
+                    local offsetX = math.cos(angle) * 3
+                    local offsetZ = math.sin(angle) * 3
+                    stringPart.Position = currentPosition + Vector3.new(offsetX, 3, offsetZ)
+                    stringPart.CFrame = CFrame.new(stringPart.Position, currentPosition)
+                end
+            end
+        end
+        
+        -- Sway animation
+        if drop.crate and drop.crate.PrimaryPart then
+            local sway = math.sin(elapsed * 2) * 3
+            drop.crate.PrimaryPart.CFrame = drop.crate.PrimaryPart.CFrame * CFrame.Angles(0, 0, math.rad(sway * 0.1))
+        end
+        
+        if progress >= 1 then
+            fallConnection:Disconnect()
+            
+            -- Remove parachute
+            if drop.parachute then
+                drop.parachute:Destroy()
+                drop.parachute = nil
+            end
+            
+            -- Play landing sound
+            if drop.crate and drop.crate.PrimaryPart then
+                playSound(SOUND_IDS.CRATE_LAND, 0.8, drop.crate.PrimaryPart)
+            end
+            
+            -- Create beacon at landing site
+            drop.beacon = createBeacon(endPosition)
+            
+            -- Mark as landed
+            drop.landed = true
+            
+            if callback then
+                callback()
+            end
+        end
+    end)
+    
+    return fallConnection
+end
+
 -- Start a supply drop
 function SupplyDropVisuals:startSupplyDrop(dropId, targetPosition)
     print("[SupplyDropVisuals] Supply drop incoming at " .. tostring(targetPosition))
     
     -- Calculate start position (high in sky)
     local startPosition = Vector3.new(targetPosition.X, CONFIG.DROP_HEIGHT, targetPosition.Z)
-    local endPosition = Vector3.new(targetPosition.X, 5, targetPosition.Z) -- Ground level + crate height
+    
+    -- Raycast to find highest ground point in crate footprint (prevent burying)
+    local maxY = -1000
+    local offsets = {
+        Vector3.new(0, 0, 0),    -- Center
+        Vector3.new(2, 0, 2),    -- Corners
+        Vector3.new(2, 0, -2),
+        Vector3.new(-2, 0, 2),
+        Vector3.new(-2, 0, -2)
+    }
+    
+    for _, offset in ipairs(offsets) do
+        local y = getSafeGroundY(targetPosition.X + offset.X, targetPosition.Z + offset.Z)
+        if y > maxY then
+            maxY = y
+        end
+    end
+    
+    if maxY == -1000 then maxY = 5 end -- Fallback
+    
+    local endPosition = Vector3.new(targetPosition.X, maxY + 1.5, targetPosition.Z) -- Ground level adjusted for crate bottom
     
     -- Play hovercraft sound
     playSound(SOUND_IDS.HOVERCRAFT, 0.6)
