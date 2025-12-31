@@ -6,7 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 print("===========================================")
-print("  THE EMBER GAMES - Simple Mode")
+print("  THE PHOENIX GAMES - Simple Mode")
 print("===========================================")
 
 -- Load simple systems

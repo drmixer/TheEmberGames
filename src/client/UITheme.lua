@@ -7,28 +7,28 @@ local UITheme = {}
 
 -- Color Palette
 UITheme.Colors = {
-    -- Primary Backgrounds (Dark, gritty)
-    Background = Color3.fromRGB(10, 10, 15),
-    Surface = Color3.fromRGB(20, 20, 28),
-    SurfaceHighlight = Color3.fromRGB(35, 35, 45),
+    -- Primary Backgrounds (Dark, warm, gritty)
+    Background = Color3.fromRGB(15, 10, 10),
+    Surface = Color3.fromRGB(28, 20, 20),
+    SurfaceHighlight = Color3.fromRGB(45, 30, 30),
     
-    -- Accents (The "Hunger Games" Gold)
-    Gold = Color3.fromRGB(255, 215, 0),
-    GoldDim = Color3.fromRGB(184, 134, 11),
-    GoldHighlight = Color3.fromRGB(255, 240, 150),
+    -- Accents (Phoenix Fire)
+    Gold = Color3.fromRGB(255, 140, 0), -- Deep Orange/Gold
+    GoldDim = Color3.fromRGB(184, 80, 11), -- Burnt Orange
+    GoldHighlight = Color3.fromRGB(255, 180, 50), -- Bright Fire
     
     -- Functional Colors
     Success = Color3.fromRGB(46, 204, 113),
-    Danger = Color3.fromRGB(231, 76, 60),
-    Text = Color3.fromRGB(240, 240, 240),
-    TextDim = Color3.fromRGB(150, 150, 160),
+    Danger = Color3.fromRGB(220, 20, 60), -- Crimson
+    Text = Color3.fromRGB(255, 245, 240), -- Warm White
+    TextDim = Color3.fromRGB(160, 140, 140), -- Warm Gray
     
     -- Rarity Colors
     Common = Color3.fromRGB(180, 180, 180),
     Uncommon = Color3.fromRGB(46, 204, 113),
     Rare = Color3.fromRGB(52, 152, 219),
     Epic = Color3.fromRGB(155, 89, 182),
-    Legendary = Color3.fromRGB(241, 196, 15),
+    Legendary = Color3.fromRGB(255, 140, 0), -- Phoenix Orange
 }
 
 -- Typography

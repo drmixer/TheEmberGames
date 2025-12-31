@@ -80,22 +80,17 @@ local function createSidebar(parent)
     logoArea.BackgroundTransparency = 1
     logoArea.Parent = container
     
-    local logoText = Instance.new("TextLabel")
-    logoText.Text = "THE\nEMBER\nGAMES"
-    logoText.Size = UDim2.new(1, 0, 1, 0)
-    logoText.BackgroundTransparency = 1
-    logoText.Font = UITheme.Fonts.Title
-    logoText.TextSize = 48
-    logoText.TextColor3 = UITheme.Colors.Gold
-    logoText.TextXAlignment = Enum.TextXAlignment.Left
-    logoText.TextYAlignment = Enum.TextYAlignment.Bottom
+    local logoImage = Instance.new("ImageLabel")
+    logoImage.Image = "rbxassetid://103414635820647" -- The Phoenix Games Logo (Image ID)
+    logoImage.Size = UDim2.new(1, 0, 1, 0) -- Use full container space
+    logoImage.Position = UDim2.new(0, 0, 0, 0)
+    logoImage.BackgroundTransparency = 1
+    logoImage.ScaleType = Enum.ScaleType.Fit -- Ensures proportions are never distorted
+    -- logoImage.ImageColor3 = UITheme.Colors.Gold -- REMOVED: Showing original image colors to prevent distortion/tinting issues
+    logoImage.Parent = logoArea
     
-    -- Add glowing stroke/shadow to text
-    local textStroke = Instance.new("UIStroke")
-    textStroke.Thickness = 2
-    textStroke.Color = Color3.new(0,0,0)
-    textStroke.Parent = logoText
-    logoText.Parent = logoArea
+    -- We removed the text logo, but kept the parent structure for minimal diff
+
     
     -- Navigation Buttons Container
     local navContainer = Instance.new("Frame")
@@ -210,7 +205,7 @@ local function createNewsCard(parent)
     title.Parent = card
     
     local body = Instance.new("TextLabel")
-    body.Text = "Welcome to Season 1 of The Ember Games!\n\n• New Arena: The scorched forest\n• 3 New Weapons\n• Ranked Mode Live\n\nMay the odds be ever in your favor."
+    body.Text = "Welcome to Season 1 of The Phoenix Games!\n\n• New Arena: The scorched forest\n• 3 New Weapons\n• Ranked Mode Live\n\nMay the odds be ever in your favor."
     body.Font = UITheme.Fonts.Body
     body.TextSize = 16
     body.TextColor3 = UITheme.Colors.Text

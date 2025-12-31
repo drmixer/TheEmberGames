@@ -100,14 +100,15 @@ local function createLoadingScreen()
     centerContainer.BackgroundTransparency = 1
     centerContainer.Parent = background
     
-    local title = Instance.new("TextLabel")
-    title.Text = "THE EMBER GAMES"
-    title.Size = UDim2.new(1, 0, 0, 60)
-    title.BackgroundTransparency = 1
-    title.Font = UITheme.Fonts.Title
-    title.TextSize = 52
-    title.TextColor3 = UITheme.Colors.Gold
-    title.Parent = centerContainer
+    local logoImage = Instance.new("ImageLabel")
+    logoImage.Image = "rbxassetid://103414635820647" -- The Phoenix Games Logo (Image ID)
+    logoImage.Size = UDim2.new(0, 400, 0, 200) -- Explicit size for loading screen
+    logoImage.Position = UDim2.new(0.5, 0, 0, 0)
+    logoImage.AnchorPoint = Vector2.new(0.5, 0)
+    logoImage.BackgroundTransparency = 1
+    logoImage.ScaleType = Enum.ScaleType.Fit
+    -- logoImage.ImageColor3 = UITheme.Colors.Gold -- REMOVED: Showing original image colors
+    logoImage.Parent = centerContainer
     
     -- Subtitle
     local subtitle = Instance.new("TextLabel")

@@ -49,7 +49,7 @@ local function createMainUI()
     titleLabel.Size = UDim2.new(1, 0, 0, 60)
     titleLabel.Position = UDim2.new(0, 0, 0, 10)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "THE EMBER GAMES"
+    titleLabel.Text = "THE PHOENIX GAMES"
     titleLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- Gold
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.TextScaled = true

@@ -24,7 +24,7 @@ local CONFIG = {
 local TUTORIAL_STEPS = {
     {
         title = "Welcome, Tribute! 🔥",
-        message = "Welcome to The Ember Games. This quick tutorial will teach you the basics of survival. May the odds be ever in your favor!",
+        message = "Welcome to The Phoenix Games. This quick tutorial will teach you the basics of survival. May the odds be ever in your favor!",
         icon = "🏟️",
         action = nil, -- Just read and continue
     },

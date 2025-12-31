@@ -102,7 +102,7 @@ function ServerMain.init()
     ShopService.init()
     
     print("[ServerMain] All services initialized successfully!")
-    print("[ServerMain] 🔥 The Ember Games is RELEASE READY! 🔥")
+    print("[ServerMain] 🔥 The Phoenix Games is RELEASE READY! 🔥")
 end
 
 ServerMain.init()
