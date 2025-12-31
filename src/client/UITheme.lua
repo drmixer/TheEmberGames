@@ -7,10 +7,10 @@ local UITheme = {}
 
 -- Color Palette
 UITheme.Colors = {
-    -- Primary Backgrounds (Dark, warm, gritty)
-    Background = Color3.fromRGB(15, 10, 10),
-    Surface = Color3.fromRGB(28, 20, 20),
-    SurfaceHighlight = Color3.fromRGB(45, 30, 30),
+    -- Primary Backgrounds (Jet Black / Neutral)
+    Background = Color3.fromRGB(0, 0, 0), -- Jet Black
+    Surface = Color3.fromRGB(20, 20, 20), -- Dark Neutral Gray
+    SurfaceHighlight = Color3.fromRGB(35, 35, 35), -- Slightly lighter Gray
     
     -- Accents (Phoenix Fire)
     Gold = Color3.fromRGB(255, 140, 0), -- Deep Orange/Gold
