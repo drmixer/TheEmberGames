@@ -109,6 +109,21 @@ function MatchService:getActivePlayers()
     return players
 end
 
+-- Get total count of active players AND bots
+function MatchService:getTotalAliveCount()
+    local playerCount = MatchService:getActivePlayerCount()
+    
+    local botCount = 0
+    local success, BotController = pcall(function()
+        return require(script.Parent.BotController)
+    end)
+    if success and BotController then
+        botCount = BotController:getAliveCount()
+    end
+    
+    return playerCount + botCount
+end
+
 -- Eliminate a player from the match
 function MatchService:eliminatePlayer(player, killer)
     if not MatchService.activePlayers[player] then
@@ -118,6 +133,10 @@ function MatchService:eliminatePlayer(player, killer)
     local playerStats = MatchService.activePlayers[player]
     local survivalTime = tick() - (MatchService.matchStartTime or playerStats.joinTime)
     
+    -- Calculate placement (active players + active bots)
+    -- Player is still in activePlayers list here, so count includes them.
+    local placement = MatchService:getTotalAliveCount()
+    
     -- Record elimination
     table.insert(MatchService.eliminatedPlayers, {
         player = player,
@@ -126,7 +145,8 @@ function MatchService:eliminatePlayer(player, killer)
         survivalTime = survivalTime,
         kills = playerStats.kills,
         killedBy = killer and killer.Name or "Environment",
-        eliminationTime = tick()
+        eliminationTime = tick(),
+        placement = placement
     })
     
     -- Update killer stats
@@ -137,7 +157,7 @@ function MatchService:eliminatePlayer(player, killer)
     -- Remove from active players
     MatchService.activePlayers[player] = nil
     
-    print("[MatchService] Player eliminated: " .. player.Name .. " (killed by: " .. (killer and killer.Name or "Environment") .. ")")
+    print("[MatchService] Player eliminated: " .. player.Name .. " (killed by: " .. (killer and killer.Name or "Environment") .. ") - Placed: " .. placement)
     
     -- Play cannon sound
     MatchService:playEliminationCannon()
@@ -148,12 +168,12 @@ function MatchService:eliminatePlayer(player, killer)
         playerId = player.UserId,
         killerName = killer and killer.Name or nil,
         remainingPlayers = MatchService:getActivePlayerCount(),
-        placement = #MatchService.eliminatedPlayers + MatchService:getActivePlayerCount()
+        placement = placement
     })
     
     -- Put eliminated player in spectator mode
     matchRemoteEvent:FireClient(player, "ENTER_SPECTATOR_MODE", {
-        placement = MatchService:getActivePlayerCount() + 1,
+        placement = placement,
         survivalTime = survivalTime,
         kills = playerStats.kills,
         killerName = killer and killer.Name or "Environment" -- Added killer name
@@ -167,6 +187,10 @@ end
 function MatchService:registerBotDeath(botData)
     local survivalTime = tick() - MatchService.matchStartTime
     
+    -- Calculate placement
+    -- Bot is already marked dead in BotController, so we add 1 to get their rank
+    local placement = MatchService:getTotalAliveCount() + 1
+    
     -- Record elimination
     table.insert(MatchService.eliminatedPlayers, {
         isBot = true,
@@ -176,10 +200,11 @@ function MatchService:registerBotDeath(botData)
         survivalTime = survivalTime,
         kills = 0, -- TODO: track bot kills if needed
         eliminationTime = tick(),
-        shownInSky = false
+        shownInSky = false,
+        placement = placement
     })
     
-    print("[MatchService] Bot elimination recorded: " .. botData.name)
+    print("[MatchService] Bot elimination recorded: " .. botData.name .. " - Placed: " .. placement)
     
     -- Play cannon sound
     MatchService:playEliminationCannon()
