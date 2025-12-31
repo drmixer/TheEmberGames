@@ -207,7 +207,27 @@ function MovementController.init()
         MovementController.originalHipHeight = nil
         MovementController.stamina = CONFIG.STAMINA_MAX
         
-        -- Footsteps handled by RbxCharacterSounds override
+        -- NUCLEAR OPTION: Continuously destroy default sounds
+        -- This overrides any Roblox behavior by checking every frame
+        RunService.Heartbeat:Connect(function()
+            if not char then return end
+            
+            -- Check Head and RootPart specifically (most common locations)
+            local partsToCheck = {char:FindFirstChild("Head"), char:FindFirstChild("HumanoidRootPart")}
+            
+            for _, part in pairs(partsToCheck) do
+                if part then
+                    for _, child in pairs(part:GetChildren()) do
+                        if child:IsA("Sound") then
+                            if child.Name == "Running" or child.Name == "Walking" or child.Name == "Jumping" or child.Name == "Landing" or child.Name == "Climbing" or child.Name == "GettingUp" then
+                                if child.Playing then child:Stop() end
+                                child:Destroy()
+                            end
+                        end
+                    end
+                end
+            end
+        end)
     end)
 end
 

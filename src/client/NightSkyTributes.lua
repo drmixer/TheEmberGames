@@ -248,8 +248,8 @@ local function displayTribute(tributeData, tributeFrame)
         end
     end
     
-    -- Play cannon sound
-    playSound(SOUND_IDS.CANNON, 0.7)
+    -- Play cannon sound - REMOVED per user request (was mistaken for siren/alarm)
+    -- playSound(SOUND_IDS.CANNON, 0.7)
     
     -- Animate in
     local fadeInInfo = TweenInfo.new(CONFIG.FADE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)

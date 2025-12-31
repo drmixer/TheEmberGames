@@ -46,7 +46,7 @@ local SOUND_IDS = {
     HEARTBEAT = "rbxassetid://9046675824", -- Heartbeat loop (tense)
     STORM_WARNING = "rbxassetid://9046676282", -- Storm rumble/warning
     STORM_DAMAGE = "rbxassetid://9046678108", -- Damage/pain sound
-    ZONE_CLOSING = "rbxassetid://9046683891", -- Alert/siren warning
+    ZONE_CLOSING = "rbxassetid://9046676282", -- Rumble (Replaced Siren)
     
     -- UI Sounds (Premium Interaction)
     UI_HOVER = "rbxassetid://6895079853", -- Subtle tick
@@ -430,7 +430,40 @@ function AudioController.init()
     createAudioGui()
     
     -- Start Footsteps
-    AudioController:startFootsteps()
+    -- AudioController:startFootsteps() -- Disabled custom footsteps
+    
+    -- Remove default Roblox footsteps
+    local function removeDefaultFootsteps(char)
+        local hrp = char:WaitForChild("HumanoidRootPart", 5)
+        if hrp then
+            -- Wait a moment for default scripts to create sounds
+            task.delay(0.5, function()
+                if not hrp then return end
+                for _, sound in pairs(hrp:GetChildren()) do
+                    if sound:IsA("Sound") and (sound.Name == "Running" or sound.Name == "Walking" or sound.Name == "Climbing" or sound.Name == "Jumping" or sound.Name == "Landing" or sound.Name == "Splash") then
+                        sound:Stop()
+                        sound:Destroy()
+                    end
+                end
+                
+                -- Listen for new sounds (sometimes they are re-added)
+                hrp.ChildAdded:Connect(function(child)
+                    if child:IsA("Sound") and (child.Name == "Running" or child.Name == "Walking" or child.Name == "Climbing" or child.Name == "Jumping" or child.Name == "Landing" or child.Name == "Splash") then
+                        task.delay(0, function()
+                            child:Stop()
+                            child:Destroy()
+                        end)
+                    end
+                end)
+            end)
+        end
+    end
+    
+    if Player.Character then
+        removeDefaultFootsteps(Player.Character)
+    end
+    
+    Player.CharacterAdded:Connect(removeDefaultFootsteps)
     
     -- Connect to audio remote events asynchronously
     task.spawn(function()

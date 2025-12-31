@@ -53,7 +53,7 @@ local SOUND_IDS = {
     HEARTBEAT = "rbxassetid://9046675824", -- Heartbeat loop (tense)
     STORM_WARNING = "rbxassetid://9046676282", -- Storm rumble/warning
     STORM_DAMAGE = "rbxassetid://9046678108", -- Damage/pain sound
-    ZONE_CLOSING = "rbxassetid://9046683891", -- Alert/siren warning
+    ZONE_CLOSING = "rbxassetid://9046676282", -- Rumble (Replaced Siren)
     
     -- UI sounds (verified interface sounds)
     COUNTDOWN_TICK = "rbxassetid://138084889", -- Verified beep
