@@ -240,20 +240,35 @@ function CharacterSpawner:spawnPlayer(player)
          local platformsFolder = workspace:FindFirstChild("SpawnPlatforms")
          local platform = platformsFolder and platformsFolder:FindFirstChild(platformName)
          
-         local targetPos = data.position
          if platform then
              -- Position on top of platform
-             targetPos = platform.Position + Vector3.new(0, 5, 0) -- Increased to 5 for safety
+             -- Fix: +3.5 studs aligns R15 feet perfectly on surface (Platform Y=1, so surface=+0.5. HipHeight=3. HRP=3.5)
+             local targetPos = platform.Position + Vector3.new(0, 3.5, 0)
+             
+             -- Teleport
              root.CFrame = CFrame.new(targetPos, Vector3.new(0, targetPos.Y, 0))
-             root.Anchored = true
+             
+             -- WELD player to platform for smooth movement
+             local weld = Instance.new("WeldConstraint")
+             weld.Name = "SpawnWeld"
+             weld.Part0 = platform
+             weld.Part1 = root
+             weld.Parent = root
+             
+             -- Unanchor root so weld works (Physics takes over relative to platform)
+             -- But keep platform anchored.
+             root.Anchored = false
+             
+             -- Lock controls
              hum.WalkSpeed = 0
              hum.JumpPower = 0
+             hum.PlatformStand = true -- Prevents physics weirdness
              
              -- Reset camera
              task.delay(0.2, function()
                  spawnerRemoteEvent:FireClient(player, "RESET_CAMERA")
              end)
-             print("[CharacterSpawner] Teleported (Anchored) " .. player.Name .. " to " .. platformName)
+             print("[CharacterSpawner] Teleported & Welded " .. player.Name .. " to " .. platformName)
          else
              warn("[CharacterSpawner] Platform " .. platformName .. " missing!")
              -- Fallback
@@ -262,7 +277,7 @@ function CharacterSpawner:spawnPlayer(player)
          end
          
          CharacterSpawner.playersSpawned[player] = true
-         spawnerRemoteEvent:FireClient(player, "SPAWNED_ON_PLATFORM", index, targetPos)
+         spawnerRemoteEvent:FireClient(player, "SPAWNED_ON_PLATFORM", index)
     end
 
     -- Initial teleport
@@ -304,9 +319,14 @@ function CharacterSpawner:endCountdown()
         -- Restore Physics & Movement
         if plr.Character then
             local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            
+            -- Remove Weld
             if root then
+                local weld = root:FindFirstChild("SpawnWeld")
+                if weld then weld:Destroy() end
                 root.Anchored = false
             end
+            
             local hum = plr.Character:FindFirstChild("Humanoid")
             if hum then
                 hum.PlatformStand = false
@@ -343,7 +363,7 @@ function CharacterSpawner:risePlatforms(duration)
     
     local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
-    -- 1. Tween Platforms
+    -- 1. Tween Platforms (Players welded to them will move automatically)
     for _, platform in ipairs(CharacterSpawner.spawnPlatforms) do
         local origCF = platform:GetAttribute("OriginalCFrame")
         if origCF then
@@ -351,29 +371,7 @@ function CharacterSpawner:risePlatforms(duration)
         end
     end
     
-    -- 2. Tween Players (Manual CFrame Tween)
-    for player, _ in pairs(CharacterSpawner.playersSpawned) do
-         if player.Character and player.Character.PrimaryPart then
-             local currentCF = player.Character.PrimaryPart.CFrame
-             local targetCF = currentCF + Vector3.new(0, 25, 0) -- Rise same amount
-             
-             TweenService:Create(player.Character.PrimaryPart, tweenInfo, {CFrame = targetCF}):Play()
-         end
-    end
-    
-    -- 3. Tween Bots (Manual CFrame Tween)
-    -- We must find all bots that were placed on platforms
-    for _, child in ipairs(workspace:GetChildren()) do
-        if child:IsA("Model") and child:FindFirstChild("IsBot") and child.PrimaryPart then
-            -- Only tween if it's on a platform (optional check: if anchored)
-             local currentCF = child.PrimaryPart.CFrame
-             local targetCF = currentCF + Vector3.new(0, 25, 0)
-             
-             TweenService:Create(child.PrimaryPart, tweenInfo, {CFrame = targetCF}):Play()
-        end
-    end
-    
-    -- 4. Notify Clients for FX
+    -- 2. Notify Clients for FX
     spawnerRemoteEvent:FireAllClients("RISE_SEQUENCE_START", duration)
 end
 

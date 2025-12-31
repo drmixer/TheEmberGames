@@ -202,7 +202,7 @@ function KillFeed:addKill(killerName, victimName, weaponType, isBetrayal)
     elseif isYourDeath then
         playSound("rbxassetid://5034047634", 0.3) -- Cannon sound
     else
-        playSound("rbxassetid://9046239626", 0.2) -- Generic notification
+        playSound("rbxassetid://4590662766", 0.5) -- Verified UI Click
     end
     
     -- Track items

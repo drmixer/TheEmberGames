@@ -206,6 +206,8 @@ function MovementController.init()
         MovementController.isCrouching = false
         MovementController.originalHipHeight = nil
         MovementController.stamina = CONFIG.STAMINA_MAX
+        
+        -- Footsteps handled by RbxCharacterSounds override
     end)
 end
 

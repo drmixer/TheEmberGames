@@ -26,7 +26,7 @@ matchRemoteEvent.Parent = ReplicatedStorage
 
 -- Sound IDs (Roblox asset IDs - using placeholder IDs, replace with actual sounds)
 local SOUND_IDS = {
-    CANNON = "rbxassetid://169259022", -- Cannon boom (Verified)
+    CANNON = "rbxassetid://5034047634", -- Cannon boom (Verified)
     MATCH_START_HORN = "rbxassetid://12221967", -- Verified Roblox Bell
     COUNTDOWN_BEEP = "rbxassetid://138084957", -- Beep for countdown
     COUNTDOWN_FINAL = "rbxassetid://138084957", -- Final countdown beep
@@ -161,6 +161,28 @@ function MatchService:eliminatePlayer(player, killer)
     
     -- Check for victory condition
     MatchService:checkVictoryCondition()
+end
+
+-- Register a BOT elimination (called by BotController)
+function MatchService:registerBotDeath(botData)
+    local survivalTime = tick() - MatchService.matchStartTime
+    
+    -- Record elimination
+    table.insert(MatchService.eliminatedPlayers, {
+        isBot = true,
+        name = botData.name,
+        userId = 0, -- Bots don't have IDs
+        district = botData.district,
+        survivalTime = survivalTime,
+        kills = 0, -- TODO: track bot kills if needed
+        eliminationTime = tick(),
+        shownInSky = false
+    })
+    
+    print("[MatchService] Bot elimination recorded: " .. botData.name)
+    
+    -- Play cannon sound
+    MatchService:playEliminationCannon()
 end
 
 -- Check if there's a winner
@@ -401,6 +423,29 @@ local function onPlayerRemoving(player)
 end
 
 -- Initialize MatchService
+-- Trigger Night Sky Sequence manually or automatically
+function MatchService:triggerNightRecap()
+    -- Get tributes who haven't been shown yet
+    local tributesToShow = {}
+    
+    for _, data in pairs(MatchService.eliminatedPlayers) do
+        if not data.shownInSky then
+            table.insert(tributesToShow, data)
+            data.shownInSky = true
+        end
+    end
+    
+    if #tributesToShow > 0 then
+        print("[MatchService] Triggering Night Sky Sequence for " .. #tributesToShow .. " tributes.")
+        matchRemoteEvent:FireAllClients("NIGHT_SKY_SEQUENCE", tributesToShow)
+        return true
+    else
+        print("[MatchService] No new tributes to show for Night Sky Sequence.")
+        return false
+    end
+end
+
+-- Initialize MatchService
 function MatchService.init()
     print("[MatchService] Initializing...")
     
@@ -428,6 +473,27 @@ function MatchService.init()
         end
     end)
     
+    -- Night Cycle Monitoring
+    local nightTriggered = false
+    task.spawn(function()
+        while true do
+            task.wait(2) -- Check every 2 seconds
+            if not MatchService.matchActive then continue end
+            
+            local clockTime = game:GetService("Lighting").ClockTime
+            
+            -- Trigger Night Sequence at 19:00 (7 PM)
+            if clockTime >= 19 and clockTime < 20 and not nightTriggered then
+                nightTriggered = true
+                MatchService:triggerNightRecap()
+                
+            -- Reset trigger at morning (06:00)
+            elseif clockTime >= 6 and clockTime < 8 and nightTriggered then
+                nightTriggered = false
+            end
+        end
+    end)
+
     print("[MatchService] Initialized successfully")
 end
 

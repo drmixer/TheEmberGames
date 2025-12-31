@@ -161,6 +161,17 @@ local function setupPlayer(player)
              local TestingService = require(script.Parent.TestingService)
              TestingService:removeAllBots()
              print("Cleaned up bots")
+        elseif cmd == "/time" then
+            local hour = tonumber(args[2]) or 12
+            game:GetService("Lighting").ClockTime = hour
+            print("Set time to " .. hour)
+        elseif cmd == "/fallen" then
+            local MatchService = require(script.Parent.MatchService)
+            if MatchService:triggerNightRecap() then
+                print("Triggered Night Recap!")
+            else
+                print("No fallen tributes to show.")
+            end
         end
     end)
     

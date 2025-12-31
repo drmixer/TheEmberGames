@@ -1,4 +1,4 @@
-A-- LocalScript: TributeIntro.lua
+-- LocalScript: TributeIntro.lua
 -- Handles the cinematic "Tube Rise" sequence visuals and audio
 -- Adds a premium feel to the match start
 
@@ -15,7 +15,7 @@ local SpawnerRemoteEvent = ReplicatedStorage:WaitForChild("SpawnerRemoteEvent")
 local TributeIntro = {}
 
 local SOUND_IDS = {
-    RISE_MECHANISM = "rbxassetid://156644485", -- Heavy mechanical lifting
+    RISE_MECHANISM = "rbxassetid://130093867", -- Heavy mechanical lifting (Verified)
     RISE_AMBIENCE = "rbxassetid://306422326", -- Machinery ambience
     LOCK_THUD = "rbxassetid://3398620867", -- Metal Thud when locking in place
 }
@@ -53,7 +53,11 @@ function TributeIntro.playRiseSequence(duration)
         
         -- Update Camera Position (Follow player as they rise)
         if Player.Character and Player.Character.PrimaryPart then
-             local currentRoot = Player.Character.PrimaryPart
+             -- FORCE camera type to prevent CameraHider or default scripts taking over
+             if Camera.CameraType ~= Enum.CameraType.Scriptable then
+                 Camera.CameraType = Enum.CameraType.Scriptable
+             end
+             
              local currentRoot = Player.Character.PrimaryPart
              
              -- Fix: Keep camera behind player, looking forward (No center lock)

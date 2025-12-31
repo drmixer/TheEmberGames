@@ -30,8 +30,8 @@ local CONFIG = {
 
 -- Sound IDs (VERIFIED Roblox audio assets)
 local SOUND_IDS = {
-    ANTHEM = "rbxassetid://12222058", -- Verified Victory music
-    CANNON = "rbxassetid://5034047634", -- Verified cannon shot SFX
+    ANTHEM = "rbxassetid://1845237632", -- Gloriana (Menu Music)
+    CANNON = "rbxassetid://138081509", -- Distant Explosion with Echo
 }
 
 -- Create screen GUI
@@ -79,7 +79,7 @@ local function createTributeFrame()
     local container = Instance.new("Frame")
     container.Name = "TributeContainer"
     container.Size = UDim2.new(0.4, 0, 0.7, 0)
-    container.Position = UDim2.new(0.3, 0, 0.1, 0)
+    container.Position = UDim2.new(0.3, 0, 0.05, 0)
     container.BackgroundTransparency = 1
     container.ZIndex = 10
     container.Parent = NightSkyTributes.screenGui
@@ -184,6 +184,11 @@ end
 
 -- Get player avatar headshot URL
 local function getAvatarUrl(userId)
+    -- Handle Bots (UserId <= 0)
+    if not userId or userId <= 0 then
+        return "rbxassetid://10070559186" -- Clean Silhouette Icon
+    end
+
     local success, result = pcall(function()
         return Players:GetUserThumbnailAsync(
             userId,
@@ -201,6 +206,7 @@ end
 
 -- Display a single tribute
 local function displayTribute(tributeData, tributeFrame)
+    task.wait(1) -- Delay for pacing and audio sync
     local avatarImage = tributeFrame:FindFirstChild("PortraitFrame"):FindFirstChild("AvatarImage")
     local nameLabel = tributeFrame:FindFirstChild("NameLabel")
     local districtLabel = tributeFrame:FindFirstChild("DistrictLabel")
@@ -306,7 +312,7 @@ function NightSkyTributes:startTributeSequence(tributes)
     task.wait(2.5)
     
     -- Play anthem music
-    local anthemSound = playSound(SOUND_IDS.ANTHEM, 0.5)
+    local anthemSound = playSound(SOUND_IDS.ANTHEM, 0.4)
     
     -- Create tribute display frame
     local tributeFrame = createTributeFrame()

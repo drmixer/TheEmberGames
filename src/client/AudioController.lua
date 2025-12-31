@@ -35,7 +35,7 @@ local SOUND_IDS = {
     PUNCH = "rbxassetid://3041190784", -- Punch/body impact
     
     -- Pickup sounds (verified item interaction)
-    ITEM_PICKUP = "rbxassetid://9046243962", -- Generic item pickup
+    ITEM_PICKUP = "rbxassetid://6042053626", -- Subtle UI Click (Replaced generic pickup)
     WEAPON_PICKUP = "rbxassetid://6230938036", -- Weapon pickup (metallic)
     LOOT_OPEN = "rbxassetid://9046219171", -- Chest/container open
     FOOD_PICKUP = "rbxassetid://9046243962", -- Food item pickup
@@ -60,12 +60,12 @@ local SOUND_IDS = {
 local MATERIAL_SOUNDS = {
     [Enum.Material.Grass] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://3041190784"}, -- Grass/Dirt
     [Enum.Material.LeafyGrass] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://3041190784"},
-    [Enum.Material.Wood] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"}, -- Wood
-    [Enum.Material.WoodPlanks] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"},
-    [Enum.Material.Cobblestone] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"}, -- Fallback to Wood/Generic
-    [Enum.Material.Concrete] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"},
-    [Enum.Material.Slate] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"},
-    [Enum.Material.Metal] = {Step = "rbxassetid://202967014", Hit = "rbxassetid://3041190784"}, -- Fallback to Wood/Generic
+    [Enum.Material.Wood] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://131237241"}, -- Wood
+    [Enum.Material.WoodPlanks] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://131237241"},
+    [Enum.Material.Cobblestone] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://131237241"}, -- Fallback
+    [Enum.Material.Concrete] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://131237241"},
+    [Enum.Material.Slate] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://131237241"},
+    [Enum.Material.Metal] = {Step = "rbxassetid://160432334", Hit = "rbxassetid://131237241"}, -- Fallback
 }
 -- Fallback
 local DEFAULT_MATERIAL_SOUND = {Step = "rbxassetid://160432334", Hit = "rbxassetid://3041190784"}
@@ -366,6 +366,7 @@ end
 
 -- Start Footstep Loop
 function AudioController:startFootsteps()
+    return -- Disabled custom footsteps as requested
     RunService.RenderStepped:Connect(function()
         local char = Player.Character
         if not char then return end

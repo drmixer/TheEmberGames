@@ -142,8 +142,8 @@ function LobbyService:beginMatch()
         end)
         
         if success and BotController then
-            -- TEMP: Spawn only 1 bot for testing Victory Sequence
-            local targetTributes = playerCount + 1 
+            -- TEMP: Spawn 2 bots (total 3 tributes) for better testing
+            local targetTributes = playerCount + 2 
             -- local targetTributes = Config.PLAYER_CAP -- Original production value
             
             if playerCount < targetTributes then

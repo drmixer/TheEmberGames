@@ -42,7 +42,7 @@ local SOUND_IDS = {
     PUNCH = "rbxassetid://12222152", -- Classic Punch
     
     -- Pickup sounds (verified item interaction)
-    ITEM_PICKUP = "rbxassetid://131138839", -- Verified click/pickup
+    ITEM_PICKUP = "rbxassetid://6042053626", -- Subtle UI Click
     WEAPON_PICKUP = "rbxassetid://6230938036", -- Weapon pickup (metallic)
     LOOT_OPEN = "rbxassetid://9046219171", -- Chest/container open
     FOOD_PICKUP = "rbxassetid://131138839", -- Eating/pickup (reused verified)

@@ -36,7 +36,7 @@ local CONFIG = {
 
 -- Sounds
 local SOUNDS = {
-    HIT = "rbxassetid://12222084", -- Classic Hit
+    HIT = "rbxassetid://566593606", -- Heavy Punch/Whack (More physical)
     CRITICAL = "rbxassetid://12222005", -- Classic Heavy Hit
     SWING = "rbxassetid://12222216" -- Classic Sword Slash
 }

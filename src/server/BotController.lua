@@ -226,20 +226,10 @@ function BotController:createBot(district, difficulty)
     
     local spawnPos
     if platform then
-        -- Check if platform has an "OriginalCFrame" (meaning it is tracked by Spawner)
-        local origCF = platform:GetAttribute("OriginalCFrame")
-        if origCF then
-            -- We want to spawn on the *lowered* state (Original - 25 studs)
-            -- Only use OriginalCFrame as reference, calculate lowered position manually to be safe
-            local loweredPos = origCF.Position - Vector3.new(0, 25, 0)
-            spawnPos = loweredPos + Vector3.new(0, 5, 0) -- On top of lowered platform
-        else
-            -- Platform exists but hasn't been prepared yet (unlikely if loop order is correct, but safe fallback)
-            -- Just put them underground to match
-             spawnPos = platform.Position - Vector3.new(0, 20, 0) -- Guessing lowered state
-        end
+        -- Position on top of the platform (Wherever it currently is)
+        spawnPos = platform.Position + Vector3.new(0, 3.5, 0)
     else
-        -- Fallback circle
+        -- Fallback circle (No platform found)
         local angle = (platformIndex/24) * math.pi * 2
         local x = math.cos(angle) * 45
         local z = math.sin(angle) * 45
@@ -248,9 +238,21 @@ function BotController:createBot(district, difficulty)
     
     character:SetPrimaryPartCFrame(CFrame.new(spawnPos, Vector3.new(0, spawnPos.Y, 0))) -- Look at center
     
-    -- Freeze initially (Anchored)
+    -- Weld to platform if available (So they rise with it)
     local hrp = character:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.Anchored = true end
+    if hrp then 
+        hrp.Anchored = false -- Must be unanchored to move with weld
+        
+        if platform then
+             local weld = Instance.new("WeldConstraint")
+             weld.Name = "SpawnWeld"
+             weld.Part0 = platform
+             weld.Part1 = hrp
+             weld.Parent = hrp
+        else
+             hrp.Anchored = true -- Fallback if no platform found
+        end
+    end
     
     -- Tag bot for CharacterSpawner to find
     character:SetAttribute("PlatformIndex", platformIndex)
@@ -641,9 +643,10 @@ function BotController:eliminateBot(botData)
         })
     end
     
-    -- IMPORTANT: Tell MatchService to check for win condition!
+    -- IMPORTANT: Register death with MatchService (for Canon/Sky Sequence)
     local MatchService = require(script.Parent.MatchService)
     if MatchService then
+        MatchService:registerBotDeath(botData)
         MatchService:checkVictoryCondition()
     end
 end

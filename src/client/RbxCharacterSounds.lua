@@ -1,0 +1,3 @@
+-- Empty script to disable default RbxCharacterSounds logic
+-- Placing this in StarterPlayerScripts prevents the default sound script from loading
+-- ensuring absolute silence for footsteps, jumping, and landing.
