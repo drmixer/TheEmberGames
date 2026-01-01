@@ -69,8 +69,8 @@ end
 local function createSidebar(parent)
     local container = Instance.new("Frame")
     container.Name = "Sidebar"
-    container.Size = UDim2.new(0, 280, 1, 0) -- Full height, fixed width
-    container.Position = UDim2.new(0, 40, 0, 0)
+    container.Size = UDim2.new(0, 280, 1, -60) -- Full height minus offset
+    container.Position = UDim2.new(0, 40, 0, 60)
     container.BackgroundTransparency = 1
     container.Parent = parent
     

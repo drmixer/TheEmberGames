@@ -94,7 +94,7 @@ local function createLoadingScreen()
     
     -- Center Logo Area
     local centerContainer = Instance.new("Frame")
-    centerContainer.Size = UDim2.new(0, 600, 0, 200)
+    centerContainer.Size = UDim2.new(0, 600, 0, 280) -- Increased height for text
     centerContainer.Position = UDim2.new(0.5, 0, 0.4, 0)
     centerContainer.AnchorPoint = Vector2.new(0.5, 0.5)
     centerContainer.BackgroundTransparency = 1
@@ -114,10 +114,10 @@ local function createLoadingScreen()
     local subtitle = Instance.new("TextLabel")
     subtitle.Text = "MAY THE ODDS BE EVER IN YOUR FAVOR"
     subtitle.Size = UDim2.new(1, 0, 0, 30)
-    subtitle.Position = UDim2.new(0, 0, 0, 65)
+    subtitle.Position = UDim2.new(0, 0, 0, 210) -- Moved down below logo
     subtitle.BackgroundTransparency = 1
-    subtitle.Font = UITheme.Fonts.Label
-    subtitle.TextSize = 14
+    subtitle.Font = UITheme.Fonts.Title -- Bolder font (GothamBlack)
+    subtitle.TextSize = 18 -- Larger text
     subtitle.TextColor3 = UITheme.Colors.TextDim
     -- Note: LetterSpacing doesn't exist in Roblox, removed
     subtitle.Parent = centerContainer
@@ -234,7 +234,7 @@ function LoadingScreen:hide()
     
     -- Cinematic Fade Out
     -- Fade out text elements
-    local fadeInfo = TweenInfo.new(0.8)
+    local fadeInfo = TweenInfo.new(0.5)
     
     if LoadingScreen.centerContainer then
         for _, c in pairs(LoadingScreen.centerContainer:GetChildren()) do
@@ -244,8 +244,8 @@ function LoadingScreen:hide()
         end
     end
     
-    -- 2. Fade Background
-    TweenService:Create(LoadingScreen.background, TweenInfo.new(1.5), {BackgroundTransparency = 1}):Play()
+    -- Main Background Fade (Faster)
+    TweenService:Create(LoadingScreen.background, TweenInfo.new(0.8), {BackgroundTransparency = 1}):Play()
     
     -- Cleanup
     task.delay(1.5, function()
