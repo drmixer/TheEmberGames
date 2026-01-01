@@ -76,7 +76,7 @@ local function createSidebar(parent)
     
     -- Logo Area
     local logoArea = Instance.new("Frame")
-    logoArea.Size = UDim2.new(1, 0, 0, 150)
+    logoArea.Size = UDim2.new(1, 0, 0, 180) -- Increased from 150 to allow larger logo
     logoArea.BackgroundTransparency = 1
     logoArea.Parent = container
     

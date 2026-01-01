@@ -102,7 +102,7 @@ local function createLoadingScreen()
     
     local logoImage = Instance.new("ImageLabel")
     logoImage.Image = "rbxassetid://103414635820647" -- The Phoenix Games Logo (Image ID)
-    logoImage.Size = UDim2.new(0, 400, 0, 200) -- Explicit size for loading screen
+    logoImage.Size = UDim2.new(0, 500, 0, 250) -- Increased size from 400x200
     logoImage.Position = UDim2.new(0.5, 0, 0, 0)
     logoImage.AnchorPoint = Vector2.new(0.5, 0)
     logoImage.BackgroundTransparency = 1
@@ -114,7 +114,7 @@ local function createLoadingScreen()
     local subtitle = Instance.new("TextLabel")
     subtitle.Text = "MAY THE ODDS BE EVER IN YOUR FAVOR"
     subtitle.Size = UDim2.new(1, 0, 0, 30)
-    subtitle.Position = UDim2.new(0, 0, 0, 210) -- Moved down below logo
+    subtitle.Position = UDim2.new(0, 0, 0, 260) -- Adjusted for larger logo (250 height + 10 padding)
     subtitle.BackgroundTransparency = 1
     subtitle.Font = UITheme.Fonts.Title -- Bolder font (GothamBlack)
     subtitle.TextSize = 18 -- Larger text
