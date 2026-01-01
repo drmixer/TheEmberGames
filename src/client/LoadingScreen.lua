@@ -240,6 +240,8 @@ function LoadingScreen:hide()
         for _, c in pairs(LoadingScreen.centerContainer:GetChildren()) do
             if c:IsA("TextLabel") then
                 TweenService:Create(c, fadeInfo, {TextTransparency = 1}):Play()
+            elseif c:IsA("ImageLabel") then
+                TweenService:Create(c, fadeInfo, {ImageTransparency = 1}):Play()
             end
         end
     end
