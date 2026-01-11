@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local PathfindingService = game:GetService("PathfindingService")
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Config = require(ReplicatedFirst.Config)
@@ -43,7 +44,11 @@ local DIFFICULTY = {
         aggressiveness = 0.3,    -- Will fight if close
         speed = 11,              -- Slow-ish movement
         attackCooldown = 3.0,    -- 3 seconds between attacks
+        attackCooldown = 3.0,    -- 3 seconds between attacks
         detectionRange = 25,     -- Notices nearby
+        hearingRange = 10,       -- Poor hearing
+        sightRange = 35,         -- Poor sight
+        fov = 90,                -- Narrow vision
     },
     MEDIUM = {
         reactionTime = 1.5,      -- Moderate reaction
@@ -52,6 +57,9 @@ local DIFFICULTY = {
         speed = 13,              -- Normal speed
         attackCooldown = 2.0,    -- 2 seconds between attacks
         detectionRange = 40,     -- Good awareness
+        hearingRange = 15,       -- Can detect through walls if close
+        sightRange = 50,         -- Must have line of sight
+        fov = 120,               -- Field of view in degrees
     },
     HARD = {
         reactionTime = 0.8,      -- Fast reaction
@@ -60,6 +68,9 @@ local DIFFICULTY = {
         speed = 15,              -- Fast
         attackCooldown = 1.5,    -- 1.5 seconds between attacks
         detectionRange = 55,     -- Great awareness
+        hearingRange = 25,       -- Very good hearing
+        sightRange = 70,         -- Eagle eyes
+        fov = 180,               -- Wide peripheral vision
     }
 }
 
@@ -208,13 +219,19 @@ function BotController:createBot(district, difficulty)
         lastAction = tick(),
         lastAttack = 0, -- Track attack cooldown
         inventory = {},
+        -- Pathfinding state
+        currentPath = nil,
+        pathIndex = 1,
+        lastPathCalculation = 0,
+        lastPathCalculation = 0,
+        destination = nil,
+        isFrozen = true, -- Start frozen until match starts
     }
     
     local character = createBotCharacter(botData)
     botData.character = character
     
-    local character = createBotCharacter(botData)
-    botData.character = character
+
     
     -- Spawn on platform (starting after real players)
     local platformIndex = #Players:GetPlayers() + botId -- Offset by player count
@@ -272,31 +289,82 @@ function BotController:createBot(district, difficulty)
     BotController:startBotAI(botData)
     
     return botData
+
+end
+
+-- Helper: Check Line of Sight
+function BotController:hasLineOfSight(botCharacter, targetCharacter, range)
+    if not botCharacter or not targetCharacter then return false end
+    
+    local myHead = botCharacter:FindFirstChild("Head")
+    local targetHead = targetCharacter:FindFirstChild("Head") or targetCharacter:FindFirstChild("HumanoidRootPart")
+    
+    if not myHead or not targetHead then return false end
+    
+    local origin = myHead.Position
+    local targetPos = targetHead.Position
+    local direction = targetPos - origin
+    
+    if direction.Magnitude > range then return false end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {botCharacter}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.IgnoreWater = true
+    
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    
+    if result then
+        if result.Instance:IsDescendantOf(targetCharacter) then
+            return true
+        else
+            return false
+        end
+    end
+    
+    return true -- Nothing hit? Should imply clear shot, but usually raycast hits target
 end
 
 -- Start bot AI behavior
+
 function BotController:startBotAI(botData)
     task.spawn(function()
         -- Initial delay - bots don't act immediately
         task.wait(math.random(3, 8))
+        
+        local lastDecisionTime = 0
         
         while botData.isAlive and botData.character and botData.character.Parent do
             local humanoid = botData.character:FindFirstChild("Humanoid")
             if not humanoid or humanoid.Health <= 0 then
                 BotController:eliminateBot(botData)
                 break
+
             end
             
-            BotController:updateBotBehavior(botData)
+            -- Wait while frozen (on platform/countdown)
+            if botData.isFrozen then
+                task.wait(0.5)
+                continue
+            end
             
-            -- Wait based on reaction time (slower = more natural)
-            task.wait(botData.difficulty.reactionTime + math.random() * 0.5)
+            local now = tick()
+            local shouldDecide = (now - lastDecisionTime > botData.difficulty.reactionTime)
+            
+            if shouldDecide then
+                lastDecisionTime = now
+            end
+            
+            BotController:updateBotBehavior(botData, shouldDecide)
+            
+            -- Fast loop for smooth movement/pathfinding
+            task.wait(0.1)
         end
     end)
 end
 
 -- Update bot behavior
-function BotController:updateBotBehavior(botData)
+function BotController:updateBotBehavior(botData, runDecisions)
     local character = botData.character
     if not character then return end
     
@@ -323,33 +391,70 @@ function BotController:updateBotBehavior(botData)
         return
     end
     
-    -- Low health? Consider fleeing
-    if humanoid.Health < 30 and math.random() < 0.6 then
-        botData.state = "fleeing"
-        BotController:flee(botData)
-        return
-    end
-    
-    -- Find nearest target
-    local nearestTarget, nearestDistance = BotController:findNearestTarget(botData)
-    
-    -- Only detect targets within detection range
-    local detectionRange = botData.difficulty.detectionRange
-    
-    if nearestTarget and nearestDistance < detectionRange then
-        -- Target in range - maybe hunt?
-        if botData.state ~= "hunting" and math.random() < botData.difficulty.aggressiveness then
-            botData.state = "hunting"
-            botData.target = nearestTarget
-        elseif botData.state == "hunting" then
-            -- Continue hunting
-            botData.target = nearestTarget
+    -- DECISION LOGIC (Only run periodically)
+    if runDecisions then
+        -- Low health? Consider fleeing
+        if humanoid.Health < 30 and math.random() < 0.6 then
+            botData.state = "fleeing"
+            BotController:flee(botData)
+            return
         end
-    else
-        -- No target in range, roam
-        if botData.state ~= "roaming" or tick() - botData.lastAction > 8 then
-            botData.state = "roaming"
-            botData.lastAction = tick()
+        
+        -- Find nearest target
+        local nearestTarget, nearestDistance = BotController:findNearestTarget(botData)
+        
+        -- Only detect targets within detection range
+        -- Check line of sight logic
+        local detectionRange = botData.difficulty.detectionRange
+        
+        if nearestTarget then
+            local hasLOS = BotController:hasLineOfSight(botData.character, nearestTarget, detectionRange)
+            local hearingRange = botData.difficulty.hearingRange or 15
+            
+            -- Can we detect them?
+            -- 1. Very close (hearing/sensing)
+            -- 2. Within sight range AND has line of sight
+            local detected = false
+            if nearestDistance < hearingRange then
+                detected = true
+            elseif nearestDistance < detectionRange and hasLOS then
+                detected = true
+            end
+            
+            if detected then
+                 -- Target in range - maybe hunt?
+                if botData.state ~= "hunting" and math.random() < botData.difficulty.aggressiveness then
+                    botData.state = "hunting"
+                    botData.target = nearestTarget
+                elseif botData.state == "hunting" then
+                    -- Continue hunting
+                    botData.target = nearestTarget
+                end
+            else
+                -- Target exists but not detected (behind wall or too far?)
+                -- If we were hunting them, we might lose them?
+                 if botData.state == "hunting" and botData.target == nearestTarget then
+                     -- Lost sight... maybe give up after a bit?
+                     if nearestDistance > detectionRange * 1.5 then
+                         botData.target = nil
+                         botData.state = "roaming"
+                     end
+                 end
+            end
+        else
+            -- No target detected at all
+            if botData.state == "hunting" then
+                 botData.target = nil
+                 botData.state = "roaming"
+            end
+        end
+        
+        if not botData.target then -- Explicit check if we lost target above
+            -- No target in range, roam
+            if botData.state ~= "roaming" or tick() - botData.lastAction > 8 then
+                botData.state = "roaming"
+                botData.lastAction = tick()
+            end
         end
     end
     
@@ -374,7 +479,22 @@ function BotController:unfreezeBots()
     for _, bot in pairs(BotController.bots) do
         if bot.character then
             local hrp = bot.character:FindFirstChild("HumanoidRootPart")
-            if hrp then hrp.Anchored = false end
+            
+            -- Remove Weld
+            if hrp then
+                local weld = hrp:FindFirstChild("SpawnWeld")
+                if weld then weld:Destroy() end
+                
+                hrp.Anchored = false 
+            end
+            
+            local hum = bot.character:FindFirstChild("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+            end
+            
+            -- Unfreeze AI
+            bot.isFrozen = false
             
             -- Costume already applied at creation
             
@@ -384,48 +504,33 @@ function BotController:unfreezeBots()
     end
 end
 
--- Find nearest target
 function BotController:findNearestTarget(botData)
-    local myHrp = botData.character:FindFirstChild("HumanoidRootPart")
-    if not myHrp then return nil, math.huge end
+    local myHrp = botData.character and botData.character:FindFirstChild("HumanoidRootPart")
+    if not myHrp then return nil, 99999 end
     
     local nearestTarget = nil
-    local nearestDistance = math.huge
+    local nearestDistance = 99999
     
-    -- Check real players
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Character then
-            local targetHrp = player.Character:FindFirstChild("HumanoidRootPart")
-            local targetHumanoid = player.Character:FindFirstChild("Humanoid")
-            
-            if targetHrp and targetHumanoid and targetHumanoid.Health > 0 then
-                local distance = (targetHrp.Position - myHrp.Position).Magnitude
-                if distance < nearestDistance then
-                    nearestDistance = distance
+    -- Check players
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = player.Character:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                local dist = (player.Character.HumanoidRootPart.Position - myHrp.Position).Magnitude
+                if dist < nearestDistance then
+                    nearestDistance = dist
                     nearestTarget = player.Character
                 end
             end
         end
     end
     
-    -- Check other bots
-    for id, otherBot in pairs(BotController.bots) do
-        if otherBot.id ~= botData.id and otherBot.isAlive and otherBot.character then
-            local targetHrp = otherBot.character:FindFirstChild("HumanoidRootPart")
-            local targetHumanoid = otherBot.character:FindFirstChild("Humanoid")
-            
-            if targetHrp and targetHumanoid and targetHumanoid.Health > 0 then
-                local distance = (targetHrp.Position - myHrp.Position).Magnitude
-                if distance < nearestDistance then
-                    nearestDistance = distance
-                    nearestTarget = otherBot.character
-                end
-            end
-        end
-    end
+    -- Check other bots? (Optional, skipping for now to keep them focused on players or just simplicity)
     
     return nearestTarget, nearestDistance
 end
+
+
 
 -- Hunt a target
 function BotController:huntTarget(botData)
@@ -446,32 +551,102 @@ function BotController:huntTarget(botData)
     end
     
     local distance = (targetHrp.Position - myHrp.Position).Magnitude
+    local hasLOS = BotController:hasLineOfSight(botData.character, target, 100)
     
     -- Attack range is ~6 studs
     if distance < 6 then
+        -- STOP MOVING TO ATTACK
+        humanoid:MoveTo(myHrp.Position)
+        
+        -- Look at target
+        myHrp.CFrame = CFrame.lookAt(myHrp.Position, Vector3.new(targetHrp.Position.X, myHrp.Position.Y, targetHrp.Position.Z))
+        
         -- Check attack cooldown
         local now = tick()
         if now - botData.lastAttack >= botData.difficulty.attackCooldown then
             -- TELEGRAPH ATTACK (Windup)
             botData.state = "windup"
             botData.lastAction = now
-            
-                -- Visual Indicator (Red Flash REMOVED based on feedback)
-                -- local head = botData.character:FindFirstChild("Head")
-                -- if head then
-                --     local highlight = Instance.new("Highlight")
-                --     ...
-                -- end
-                
-                -- Play windup sound? (Generic woosh)
-            end
-    elseif distance < 50 then
-        -- Chase target (but not too fast)
-        humanoid:MoveTo(targetHrp.Position)
+        end
+    elseif distance < 60 then
+        -- Chase target
+        if hasLOS then
+            -- Direct movement if visible (faster, smoother)
+            humanoid:MoveTo(targetHrp.Position)
+            botData.currentPath = nil -- Clear path if we can see them
+        else
+            -- Pathfinding if blocked
+            BotController:moveToPathfinding(botData, targetHrp.Position)
+        end
     else
         -- Lost target, go back to roaming
         botData.target = nil
         botData.state = "roaming"
+    end
+end
+
+-- Helper: Move with pathfinding
+function BotController:moveToPathfinding(botData, targetPosition)
+    local humanoid = botData.character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    local now = tick()
+    
+    -- Recalculate path periodically or if none exists
+    if not botData.currentPath or now - botData.lastPathCalculation > 1.0 then
+        botData.lastPathCalculation = now
+        
+        local path = PathfindingService:CreatePath({
+            AgentRadius = 2.5,
+            AgentHeight = 5.0,
+            AgentCanJump = true,
+            WaypointSpacing = 4,
+        })
+        
+        local success, errorMessage = pcall(function()
+            path:ComputeAsync(botData.character.PrimaryPart.Position, targetPosition)
+        end)
+        
+        if success and path.Status == Enum.PathStatus.Success then
+            botData.currentPath = path:GetWaypoints()
+            botData.pathIndex = 2 -- Skip current position (1)
+        else
+            -- Fallback
+            humanoid:MoveTo(targetPosition)
+            botData.currentPath = nil
+            return
+        end
+    end
+    
+    -- Follow current path
+    if botData.currentPath and botData.pathIndex <= #botData.currentPath then
+        local waypoint = botData.currentPath[botData.pathIndex]
+        
+        -- Check if we reached this waypoint
+        local myPos = botData.character.PrimaryPart.Position
+        local distToWaypoint = (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(waypoint.Position.X, 0, waypoint.Position.Z)).Magnitude
+        
+        if distToWaypoint < 4 then
+            botData.pathIndex = botData.pathIndex + 1
+            if botData.pathIndex <= #botData.currentPath then
+                waypoint = botData.currentPath[botData.pathIndex]
+            else
+                -- Finished path
+                botData.currentPath = nil
+                return
+            end
+        end
+        
+        -- Jump if needed
+        if waypoint.Action == Enum.PathWaypointAction.Jump then
+            humanoid.Jump = true
+        end
+        
+        humanoid:MoveTo(waypoint.Position)
+    else
+        botData.currentPath = nil
+        -- Fallback direct
+        humanoid:MoveTo(targetPosition)
     end
 end
 
@@ -567,15 +742,43 @@ function BotController:roamAround(botData)
     
     if not humanoid or not hrp then return end
     
-    -- Pick a nearby random destination (not too far)
+    -- If we have a destination and active path, continue
+    if botData.destination and botData.currentPath then
+        BotController:moveToPathfinding(botData, botData.destination)
+        
+        -- Check if arrived
+        local dist = (hrp.Position - botData.destination).Magnitude
+        if dist < 5 then
+            botData.destination = nil
+            botData.currentPath = nil
+            botData.lastAction = tick() -- Wait a bit before picking new spot
+        end
+        
+        -- Timeout if stuck
+        if tick() - botData.lastAction > 15 then
+            botData.destination = nil
+            botData.currentPath = nil
+        end
+        
+        return
+    end
+    
+    -- Pick a new random destination
     local destination = hrp.Position + Vector3.new(
-        math.random(-50, 50),
+        math.random(-60, 60),
         0,
-        math.random(-50, 50)
+        math.random(-60, 60)
     )
     
-    humanoid:MoveTo(destination)
-    botData.lastAction = tick()
+    -- Raycast down to find ground
+    local rayOrigin = destination + Vector3.new(0, 50, 0)
+    local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -100, 0))
+    if rayResult then
+        destination = rayResult.Position
+        botData.destination = destination
+        botData.lastPathCalculation = 0 -- Force new path
+        BotController:moveToPathfinding(botData, destination)
+    end
 end
 
 -- Flee from danger
